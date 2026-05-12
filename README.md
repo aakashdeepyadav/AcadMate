@@ -8,6 +8,13 @@ AcadMate is an enterprise-grade academic management ecosystem designed to elimin
 
 ---
 
+## 📱 Download Latest APK
+You can download the latest production-ready APK from the link below:
+
+[**⬇️ Download AcadMate v1.1.0-Premium**](https://github.com/aakashsharma/AcadMate/releases/latest)
+
+---
+
 ## 🔐 The 7-Layer Anti-Proxy Protocol
 AcadMate solves the "Proxy Problem" in Indian colleges through a mandatory 7-layer verification stack that makes marking attendance for a friend statistically and practically impossible.
 
@@ -77,10 +84,15 @@ The project is divided into specialized Gradle modules:
 ## 🚀 Deployment & Developer Setup
 
 ### **Mandatory Configuration**
-1.  **API Keys**: Add `GEMINI_API_KEY=your_key` to your `local.properties` file.
-2.  **Integrity API**: Enable **Play Integrity API** in the Google Cloud Console.
-3.  **Firebase Setup**: Register your **SHA-256** fingerprint in the Firebase Console to enable Phone MFA and Play Integrity.
-4.  **Storage**: Initialize **Firebase Storage** for profile pictures and assignment file handling.
+1.  **Clone the Repository**: `git clone https://github.com/aakashsharma/AcadMate.git`
+2.  **API Keys**: Add `GEMINI_API_KEY=your_key` to your `local.properties` file.
+3.  **Firebase Setup**: 
+    *   Create a Firebase project.
+    *   Add `google-services.json` to the `app/` folder (This file is ignored by git for security).
+    *   Enable **Phone Authentication** and **Firestore**.
+    *   Register your **SHA-256** fingerprint in the Firebase Console.
+4.  **Integrity API**: Enable **Play Integrity API** in the Google Cloud Console.
+5.  **Storage**: Initialize **Firebase Storage** for profile pictures and assignment file handling.
 
 ### **Institutional Test Credentials**
 The system enforces **Two-Step Verification (MFA)** for all accounts.
@@ -91,7 +103,10 @@ The system enforces **Two-Step Verification (MFA)** for all accounts.
 | **Faculty** | `100001` | `Password@123` | Phone OTP |
 | **Admin** | `9001` | `Password@123` | Phone OTP |
 
-*Note: For development, use `+919935079889` or register your own number in the Firebase "Test Numbers" section.*
+
+---
+## ⚠️ Security Notice
+This repository excludes sensitive configuration files such as `google-services.json` and `local.properties`. If you fork this project, you **must** provide your own Firebase configuration to make the app functional.
 
 ---
 *Built for the next generation of academic excellence. Smart India Hackathon 2025.*
