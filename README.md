@@ -11,7 +11,7 @@ AcadMate is an enterprise-grade academic management ecosystem designed to elimin
 ## 📱 Download Latest APK
 You can download the latest production-ready APK from the link below:
 
-[**⬇️ Download AcadMate v1.1.0-Premium**](https://github.com/aakashsharma/AcadMate/releases/latest)
+[**⬇️ Download AcadMate v1.1.0-Premium**](https://github.com/aakashdeepyadav/AcadMate/releases/download/v1.1.0/AcadMate-v1.1.0.apk)
 
 ---
 
@@ -84,7 +84,7 @@ The project is divided into specialized Gradle modules:
 ## 🚀 Deployment & Developer Setup
 
 ### **Mandatory Configuration**
-1.  **Clone the Repository**: `git clone https://github.com/aakashsharma/AcadMate.git`
+1.  **Clone the Repository**: `git clone https://github.com/aakashdeepyadav/AcadMate.git`
 2.  **API Keys**: Add `GEMINI_API_KEY=your_key` to your `local.properties` file.
 3.  **Firebase Setup**: 
     *   Create a Firebase project.
