@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">AcadMate</string>
+
+    <!-- Google Sign-In Web Client ID -->
+    <!-- Get this from Firebase Console > Project Settings > Service Accounts -->
+    <string name="default_web_client_id">231335648499-iml550vr2dqepig1i5slqkvg9ca8cc4m.apps.googleusercontent.com</string>
+</resources>

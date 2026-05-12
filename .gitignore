@@ -1,0 +1,64 @@
+# Android Studio / IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+.shelf/
+.settings/
+.idea/caches/
+.idea/libraries/
+.idea/modules.xml
+.idea/workspace.xml
+.idea/navEditor.xml
+.idea/assetWizardSettings.xml
+.idea/runConfigurations/
+.idea/deploymentTargetDropDown.xml
+
+# Gradle
+.gradle/
+build/
+/*/build/
+gradle-app.setting
+!gradle-wrapper.jar
+.gradletasknamecache
+
+# Local configuration
+local.properties
+
+# Log files
+*.log
+
+# Android Captures
+/captures/
+
+# External Native Build
+.externalNativeBuild/
+.cxx/
+
+# OS X
+.DS_Store
+
+# User-specific stuff
+.last_build_id
+
+# Key Files
+*.jks
+*.keystore
+!debug.keystore
+
+# Google Services (usually excluded in public repos)
+app/google-services.json
+
+# Screenshots
+screenshots/
+
+# Backup files
+*.bak
+*.swp
+*~
+
+# Crashlytics
+com_crashlytics_export_strings.xml
+crashlytics.properties
+crashlytics-build.properties
