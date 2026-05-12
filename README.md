@@ -2,9 +2,9 @@
 [![Platform](https://img.shields.io/badge/Platform-Android-green.svg)](https://developer.android.com/android)
 [![Architecture](https://img.shields.io/badge/Architecture-Clean%20%2B%20Modular-blue.svg)](https://developer.android.com/topic/architecture)
 [![Backend](https://img.shields.io/badge/Backend-Firebase-orange.svg)](https://firebase.google.com/)
-[![Security](https://img.shields.io/badge/Security-7--Layer%20Anti--Proxy-red.svg)]()
+[![Security](https://img.shields.io/badge/Security-6--Layer%20Anti--Proxy-red.svg)]()
 
-AcadMate is an enterprise-grade academic management ecosystem designed to eliminate institutional friction. It integrates a **proprietary 7-layer anti-proxy attendance protocol** with a **context-aware AI Learning Suite**, providing a unified infrastructure for Administrators, Faculty, and Students.
+AcadMate is an enterprise-grade academic management ecosystem designed to eliminate institutional friction. It integrates a **proprietary 6-layer anti-proxy attendance protocol** with a **context-aware AI Learning Suite**, providing a unified infrastructure for Administrators, Faculty, and Students.
 
 ---
 
@@ -15,16 +15,15 @@ You can download the latest production-ready APK from the link below:
 
 ---
 
-## 🔐 The 7-Layer Anti-Proxy Protocol
-AcadMate solves the "Proxy Problem" in Indian colleges through a mandatory 7-layer verification stack that makes marking attendance for a friend statistically and practically impossible.
+## 🔐 The 6-Layer Anti-Proxy Protocol
+AcadMate solves the "Proxy Problem" in Indian colleges through a mandatory 6-layer verification stack that makes marking attendance for a friend statistically and practically impossible.
 
-1.  **Temporal Window (Layer 1)**: Verification is strictly permitted only during the first 10 minutes of the session start time to prevent late-arrival spoofing.
+1.  **Hardware-Level Binding (Layer 1)**: Each account is cryptographically locked to a single `ANDROID_ID`. "Phone passing" is impossible as you cannot log into your account on another device without Admin approval.
 2.  **Acoustic Proximity (Layer 2)**: Uses near-ultrasonic handshakes (18.5kHz) to prove the device is physically located within the classroom's four walls (Solves the "Indoor GPS" accuracy problem).
 3.  **ML Face Liveness (Layer 3)**: Uses Google ML Kit to detect natural blinks and micro-movements, blocking static photo, video, or synthetic deepfake spoofing.
-4.  **Hardware-Level Binding (Layer 4)**: Each account is cryptographically locked to a single `ANDROID_ID`. "Phone passing" is impossible as you cannot log into your account on another device without Admin approval.
-5.  **Campus Geofencing (Layer 5)**: High-precision GPS validation using a Ray-casting polygon algorithm ensures the user is within the registered institutional boundaries.
-6.  **Continuous Presence Monitoring (Layer 6)**: A foreground service maintains a secure connection and location heartbeats throughout the lecture duration, flagging devices that leave the area early.
-7.  **Biometric Re-authentication (Layer 7)**: Randomized fingerprint or FaceID checks during long sessions (triggered every 30 mins) ensure the student hasn't left their device in the classroom while they are physically absent.
+4.  **Campus Geofencing (Layer 4)**: High-precision GPS validation using a Ray-casting polygon algorithm ensures the user is within the registered institutional boundaries.
+5.  **Continuous Presence Monitoring (Layer 5)**: A foreground service maintains a secure connection and location heartbeats throughout the lecture duration, flagging devices that leave the area early.
+6.  **Biometric Re-authentication (Layer 6)**: Randomized fingerprint or FaceID checks during long sessions (triggered every 30 mins) ensure the student hasn't left their device in the classroom while they are physically absent.
 
 ---
 
@@ -50,7 +49,7 @@ A suite of tools designed to reduce administrative load and maximize teaching ti
 
 ### 3. Student (The Intelligent Learner)
 A personal companion that handles the "mechanics" of college life, allowing the student to focus on learning.
-*   **7-Layer Secure Attendance**: A frictionless, 10-second verification process that proves presence within the classroom walls.
+*   **6-Layer Secure Attendance**: A frictionless, 10-second verification process that proves presence within the classroom walls.
 *   **Contextual AI Professor (Gemini 3 Flash)**: An AI tutor that knows your real assignments, attendance history, and specific syllabus gaps to provide personalized help.
 *   **Academic Transcript & Visualized Performance**: Real-time tracking of CGPA/SGPA with interactive health rings for attendance percentages per subject.
 *   **Smart Timetable & Auto-Alarms**: Automated class reminders with a built-in alarm scheduler (Android AlarmManager integration) and "Focus Mode" to block distractions.
@@ -71,7 +70,7 @@ A personal companion that handles the "mechanics" of college life, allowing the 
 The project is divided into specialized Gradle modules:
 - `:app`: Main entry point and application shell.
 - `:auth`: Identity management, 2-step verification (MFA), and phone authentication.
-- `:attendance`: The 7-layer verification engine, acoustic processing, and geofencing.
+- `:attendance`: The 6-layer verification engine, acoustic processing, and geofencing.
 - `:ai`: Learning suite, Gemini tutor integration, and syllabus analysis tools.
 - `:dashboard`: Specialized home screens for Student, Faculty, and Admin roles.
 - `:admin`: Institutional management tools for users and courses.
