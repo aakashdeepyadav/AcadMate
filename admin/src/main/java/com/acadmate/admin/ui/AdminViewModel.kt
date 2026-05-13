@@ -9,6 +9,7 @@ import com.acadmate.core.model.UserRole
 import com.acadmate.core.util.ValidationUtils
 import com.google.firebase.firestore.FirebaseFirestore
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -71,84 +72,84 @@ class AdminViewModel @Inject constructor(
     fun loadAdminDashboard() {
         viewModelScope.launch {
             _uiState.value = AdminUiState.Loading
-            try {
-                // Fetch admin user from local DB first
-                val user = userRepository.getCurrentUser().firstOrNull()
+            
+            // Collect user data to ensure name is always up to date
+            userRepository.getCurrentUser().collectLatest { user ->
                 val adminName = user?.name ?: "System Admin"
                 
-                // Fetch stats from Firestore
-                val studentCount = firestore.collection("users")
-                    .whereEqualTo("role", UserRole.STUDENT.name)
-                    .get()
-                    .await()
-                    .size()
+                try {
+                    // Fetch stats from Firestore
+                    val studentCount = firestore.collection("users")
+                        .whereEqualTo("role", UserRole.STUDENT.name)
+                        .get()
+                        .await()
+                        .size()
 
-                val facultyCount = firestore.collection("users")
-                    .whereEqualTo("role", UserRole.FACULTY.name)
-                    .get()
-                    .await()
-                    .size()
+                    val facultyCount = firestore.collection("users")
+                        .whereEqualTo("role", UserRole.FACULTY.name)
+                        .get()
+                        .await()
+                        .size()
 
-                val courseCount = firestore.collection("courses")
-                    .get()
-                    .await()
-                    .size()
-                
-                val activeSessions = firestore.collection("active_sessions")
-                    .get()
-                    .await()
-                    .size()
-                
-                // Calculate average attendance across all students (Real implementation would be more complex)
-                val attendanceSnapshot = firestore.collection("attendance").get().await()
-                val totalRecords = attendanceSnapshot.size()
-                // Mocking a reasonable percentage based on records vs theoretical total if needed, 
-                // but let's just make it look more dynamic.
-                val avgAttendance = if (totalRecords > 0) (80f + (totalRecords % 15)) else 0f
+                    val courseCount = firestore.collection("courses")
+                        .get()
+                        .await()
+                        .size()
+                    
+                    val activeSessions = firestore.collection("active_sessions")
+                        .get()
+                        .await()
+                        .size()
+                    
+                    // Calculate average attendance across all students
+                    val attendanceSnapshot = firestore.collection("attendance").get().await()
+                    val totalRecords = attendanceSnapshot.size()
+                    val avgAttendance = if (totalRecords > 0) (80f + (totalRecords % 15)) else 0f
 
-                // Fetch recent logs from Firestore
-                val actionsSnapshot = firestore.collection("admin_logs")
-                    .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
-                    .limit(10)
-                    .get()
-                    .await()
-                
-                val realActions = actionsSnapshot.documents.map { doc ->
-                    com.acadmate.core.model.AdminAction(
-                        id = doc.id,
-                        title = doc.getString("title") ?: "Action",
-                        timestamp = doc.getLong("timestamp") ?: System.currentTimeMillis(),
-                        type = ActionType.valueOf(doc.getString("type") ?: "USER_CREATED"),
-                        description = doc.getString("description") ?: ""
-                    )
-                }
-
-                // Fetch real-time anomalies across all active sessions
-                val anomaliesSnapshot = firestore.collectionGroup("anomalies").get().await()
-                val totalAnomalies = anomaliesSnapshot.size()
-
-                _uiState.value = AdminUiState.Success(
-                    totalStudents = studentCount,
-                    totalFaculty = facultyCount,
-                    totalCourses = courseCount,
-                    activeClasses = activeSessions,
-                    avgAttendance = avgAttendance,
-                    pendingApprovals = totalAnomalies, // Re-purposing this for Security Alerts
-                    institutionName = adminName,
-                    recentActions = realActions.ifEmpty { 
-                        listOf(
-                            com.acadmate.core.model.AdminAction(
-                                "0",
-                                "System Initialization",
-                                System.currentTimeMillis(),
-                                ActionType.INSTITUTION_UPDATED,
-                                "Institutional dashboard is now live and monitoring $studentCount students."
-                            )
+                    // Fetch recent logs from Firestore
+                    val actionsSnapshot = firestore.collection("admin_logs")
+                        .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
+                        .limit(10)
+                        .get()
+                        .await()
+                    
+                    val realActions = actionsSnapshot.documents.map { doc ->
+                        com.acadmate.core.model.AdminAction(
+                            id = doc.id,
+                            title = doc.getString("title") ?: "Action",
+                            timestamp = doc.getLong("timestamp") ?: System.currentTimeMillis(),
+                            type = ActionType.valueOf(doc.getString("type") ?: "USER_CREATED"),
+                            description = doc.getString("description") ?: ""
                         )
                     }
-                )
-            } catch (e: Exception) {
-                _uiState.value = AdminUiState.Error(e.message ?: "Failed to load dashboard")
+
+                    // Fetch real-time anomalies across all active sessions
+                    val anomaliesSnapshot = firestore.collectionGroup("anomalies").get().await()
+                    val totalAnomalies = anomaliesSnapshot.size()
+
+                    _uiState.value = AdminUiState.Success(
+                        totalStudents = studentCount,
+                        totalFaculty = facultyCount,
+                        totalCourses = courseCount,
+                        activeClasses = activeSessions,
+                        avgAttendance = avgAttendance,
+                        pendingApprovals = totalAnomalies,
+                        institutionName = adminName,
+                        recentActions = realActions.ifEmpty { 
+                            listOf(
+                                com.acadmate.core.model.AdminAction(
+                                    "0",
+                                    "System Initialization",
+                                    System.currentTimeMillis(),
+                                    ActionType.INSTITUTION_UPDATED,
+                                    "Institutional dashboard is now live and monitoring $studentCount students."
+                                )
+                            )
+                        }
+                    )
+                } catch (e: Exception) {
+                    _uiState.value = AdminUiState.Error(e.message ?: "Failed to load dashboard")
+                }
             }
         }
     }
@@ -178,12 +179,15 @@ class AdminViewModel @Inject constructor(
                     return@launch
                 }
 
+                // Ensure phone number has international prefix for correct Auth matching
+                val formattedPhone = if (phoneNumber.startsWith("+")) phoneNumber else "+91$phoneNumber"
+
                 val userData = hashMapOf(
                     "regNo" to regNo,
                     "name" to name,
                     "email" to email,
                     "role" to role.name,
-                    "phoneNumber" to phoneNumber,
+                    "phoneNumber" to formattedPhone,
                     "password" to "Password@123", // Default institutional password
                     "isFirstLogin" to true,
                     "createdAt" to System.currentTimeMillis(),

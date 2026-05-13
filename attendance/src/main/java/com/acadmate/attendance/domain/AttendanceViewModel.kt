@@ -271,12 +271,14 @@ class AttendanceViewModel @Inject constructor(
         val currentHour = now.hour
         val hourlySessionId = "${subject.replace(":", "_").replace(" ", "_")}_${now.year}${now.monthValue}${now.dayOfMonth}_$currentHour"
 
+        val displayFaculty = if (faculty.isBlank() || faculty == "Faculty") "Not Assigned" else faculty
+
         val record = AttendanceRecord(
             id = hourlySessionId,
             subject = subject,
             date = now,
             markedAt = now,
-            faculty = faculty,
+            faculty = displayFaculty,
             status = AttendanceStatus.PRESENT
         )
 
@@ -287,7 +289,7 @@ class AttendanceViewModel @Inject constructor(
                     "sessionId" to hourlySessionId,
                     "studentId" to userId,
                     "subject" to subject,
-                    "faculty" to faculty,
+                    "faculty" to displayFaculty,
                     "hour" to currentHour,
                     "date" to "${now.year}-${now.monthValue}-${now.dayOfMonth}",
                     "timestamp" to System.currentTimeMillis(),

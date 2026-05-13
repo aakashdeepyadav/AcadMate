@@ -70,15 +70,15 @@ class TimetableViewModel @Inject constructor(
         val mondayClasses = repository.getTimetableForDaySync(1)
         if (mondayClasses.isEmpty()) {
             val cseClasses = listOf(
-                TimetableEntity("1", 1, "Data Structures & Algorithms", "Dr. Alan Turing", "09:00", "10:30", "Lab 3", 0),
-                TimetableEntity("2", 1, "Operating Systems", "Prof. Linus Torvalds", "11:00", "12:30", "Room 402", 0),
-                TimetableEntity("3", 1, "Computer Networks", "Dr. Vint Cerf", "14:00", "15:30", "Room 405", 0),
-                TimetableEntity("4", 2, "Database Management Systems", "Dr. E.F. Codd", "09:00", "10:30", "Room 301", 0),
-                TimetableEntity("5", 2, "Compiler Design", "Prof. Grace Hopper", "11:00", "12:30", "Lab 2", 0),
-                TimetableEntity("6", 3, "Artificial Intelligence", "Dr. John McCarthy", "10:00", "11:30", "Room 501", 0),
-                TimetableEntity("7", 3, "Software Engineering", "Prof. Margaret Hamilton", "13:00", "14:30", "Room 402", 0),
-                TimetableEntity("8", 4, "Data Structures Lab", "Dr. Alan Turing", "09:00", "12:00", "Lab 3", 0),
-                TimetableEntity("9", 5, "Computer Networks Lab", "Dr. Vint Cerf", "14:00", "17:00", "Lab 4", 0)
+                TimetableEntity("1", 1, "Data Structures & Algorithms", "", "09:00", "10:30", "Lab 3", 0),
+                TimetableEntity("2", 1, "Operating Systems", "", "11:00", "12:30", "Room 402", 0),
+                TimetableEntity("3", 1, "Computer Networks", "", "14:00", "15:30", "Room 405", 0),
+                TimetableEntity("4", 2, "Database Management Systems", "", "09:00", "10:30", "Room 301", 0),
+                TimetableEntity("5", 2, "Compiler Design", "", "11:00", "12:30", "Lab 2", 0),
+                TimetableEntity("6", 3, "Artificial Intelligence", "", "10:00", "11:30", "Room 501", 0),
+                TimetableEntity("7", 3, "Software Engineering", "", "13:00", "14:30", "Room 402", 0),
+                TimetableEntity("8", 4, "Data Structures Lab", "", "09:00", "12:00", "Lab 3", 0),
+                TimetableEntity("9", 5, "Computer Networks Lab", "", "14:00", "17:00", "Lab 4", 0)
             )
             repository.insertTimetable(cseClasses)
         }
@@ -100,7 +100,6 @@ class TimetableViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(selectedDay = dayName, isLoading = true)
             
             repository.getTimetableForDay(dayIndex).collectLatest { entities ->
-                val now = LocalTime.now()
                 val entries = entities.map { entity ->
                     val startTime = LocalTime.parse(entity.startTime)
                     val endTime = LocalTime.parse(entity.endTime)
@@ -110,7 +109,7 @@ class TimetableViewModel @Inject constructor(
                     TimetableEntry(
                         id = entity.id,
                         subject = entity.subject,
-                        faculty = entity.faculty,
+                        faculty = if (entity.faculty.isBlank()) "Not Assigned" else entity.faculty,
                         room = entity.room,
                         startTime = startTime,
                         endTime = endTime,

@@ -36,23 +36,22 @@ import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.launch
 
 data class ProfileUiState(
-    val name: String = FirebaseAuth.getInstance().currentUser?.displayName ?: "",
-    val email: String = FirebaseAuth.getInstance().currentUser?.email ?: "",
-    val phone: String = FirebaseAuth.getInstance().currentUser?.phoneNumber ?: "",
+    val name: String = "Loading...",
+    val email: String = "",
+    val phone: String = "",
     val enrollment: String = "",
     val department: String = "",
     val role: String = "",
     val address: String = "N/A",
-    val overallAttendance: Float = 0.78f,
-    val classesAttended: Int = 35,
-    val classesMissed: Int = 10,
-    val profilePictureUrl: String? = FirebaseAuth.getInstance().currentUser?.photoUrl?.toString()
+    val overallAttendance: Float = 0f,
+    val classesAttended: Int = 0,
+    val classesMissed: Int = 0,
+    val profilePictureUrl: String? = null
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
-    uiState: ProfileUiState = ProfileUiState(),
     onBackClick: () -> Unit = {},
     onEditClick: () -> Unit = {},
     onSignOut: () -> Unit = {},
@@ -65,6 +64,7 @@ fun ProfileScreen(
     onDarkModeToggle: (Boolean) -> Unit = {},
     viewModel: ProfileViewModel = androidx.hilt.navigation.compose.hiltViewModel()
 ) {
+    val uiState by viewModel.profileUiState.collectAsState()
     var showEditDialog by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val updateState by viewModel.updateState.collectAsState()

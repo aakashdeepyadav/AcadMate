@@ -74,6 +74,7 @@ import com.acadmate.assignments.ui.GradebookScreen
 import com.acadmate.assignments.ui.ResourceManagerScreen
 import com.acadmate.admin.ui.CourseManagementScreen
 import com.acadmate.admin.ui.AuditLogScreen
+import com.acadmate.admin.ui.TimetableManagementScreen
 import com.acadmate.assignments.ui.AssignmentDetailScreen
 
 import com.acadmate.core.datastore.OnboardingDataStore
@@ -393,6 +394,7 @@ fun AppNavGraph(
                             AdminDashboardScreen(
                                 onAddUserClick = { navController.navigate(Routes.CreateUser) },
                                 onManageCoursesClick = { navController.navigate(Routes.CourseManagement) },
+                                onScheduleClick = { navController.navigate(Routes.TimetableManagement) },
                                 onAuditLogClick = { navController.navigate(Routes.AuditLog) },
                                 onSettingsClick = { navController.navigate(Routes.CampusSetup) },
                                 onSignOut = {
@@ -629,44 +631,29 @@ fun AppNavGraph(
                 }
 
                 composable<Routes.Profile> {
-                    val homeViewModel: com.acadmate.dashboard.student.StudentHomeViewModel = hiltViewModel()
-                    val homeUiState by homeViewModel.uiState.collectAsStateWithLifecycle()
-                    val authViewModel: AuthViewModel = hiltViewModel()
-                    val onboardingViewModel: OnboardingViewModel = hiltViewModel()
-                    
-                    val profileUiState = com.acadmate.dashboard.student.ProfileUiState(
-                        name = homeUiState.studentName,
-                        email = homeUiState.studentEmail,
-                        phone = homeUiState.studentPhone,
-                        enrollment = homeUiState.studentEnrollment,
-                        department = homeUiState.studentDepartment,
-                        role = homeUiState.studentRole,
-                        address = homeUiState.studentAddress,
-                        overallAttendance = homeUiState.attendancePercentage,
-                        profilePictureUrl = homeUiState.profilePictureUrl
-                    )
+                val authViewModel: AuthViewModel = hiltViewModel()
+                val onboardingViewModel: OnboardingViewModel = hiltViewModel()
+                
+                val isDarkModeStored by onboardingViewModel.onboardingDataStore.isDarkMode.collectAsState(initial = null)
+                val isDarkMode = isDarkModeStored ?: androidx.compose.foundation.isSystemInDarkTheme()
 
-                    val isDarkModeStored by onboardingViewModel.onboardingDataStore.isDarkMode.collectAsState(initial = null)
-                    val isDarkMode = isDarkModeStored ?: androidx.compose.foundation.isSystemInDarkTheme()
-
-                    ProfileScreen(
-                        uiState = profileUiState,
-                        onBackClick = { navController.popBackStack() },
-                        onSignOut = {
-                            authViewModel.signOut()
-                            navController.navigate(Routes.AuthGraph) {
-                                popUpTo(navController.graph.id) { inclusive = true }
-                            }
-                        },
-                        onNotificationsClick = { navController.navigate(Routes.Notifications) },
-                        onPrivacyClick = { navController.navigate(Routes.Privacy) },
-                        onHelpClick = { navController.navigate(Routes.Help) },
-                        onAboutClick = { navController.navigate(Routes.About) },
-                        onPushNotificationsClick = { navController.navigate(Routes.ManageNotifications) },
-                        isDarkMode = isDarkMode,
-                        onDarkModeToggle = { onboardingViewModel.setDarkMode(it) }
-                    )
-                }
+                ProfileScreen(
+                    onBackClick = { navController.popBackStack() },
+                    onSignOut = {
+                        authViewModel.signOut()
+                        navController.navigate(Routes.AuthGraph) {
+                            popUpTo(navController.graph.id) { inclusive = true }
+                        }
+                    },
+                    onNotificationsClick = { navController.navigate(Routes.Notifications) },
+                    onPrivacyClick = { navController.navigate(Routes.Privacy) },
+                    onHelpClick = { navController.navigate(Routes.Help) },
+                    onAboutClick = { navController.navigate(Routes.About) },
+                    onPushNotificationsClick = { navController.navigate(Routes.ManageNotifications) },
+                    isDarkMode = isDarkMode,
+                    onDarkModeToggle = { onboardingViewModel.setDarkMode(it) }
+                )
+            }
 
                 composable<Routes.ManageNotifications> {
                     ManageNotificationsScreen(onBackClick = { navController.popBackStack() })
@@ -718,6 +705,11 @@ fun AppNavGraph(
                 }
                 composable<Routes.CourseManagement> {
                     CourseManagementScreen(
+                        onBackClick = { navController.popBackStack() }
+                    )
+                }
+                composable<Routes.TimetableManagement> {
+                    TimetableManagementScreen(
                         onBackClick = { navController.popBackStack() }
                     )
                 }

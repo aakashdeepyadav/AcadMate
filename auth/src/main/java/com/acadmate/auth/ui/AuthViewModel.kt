@@ -318,6 +318,8 @@ class AuthViewModel @Inject constructor(
                 val result = auth.signInWithCredential(credential).await()
 
                 if (result.user != null) {
+                    // Sync user data to local DB before proceeding
+                    userRepository.syncUserData(result.user!!.uid)
                     onboardingDataStore.setOnboardingCompleted(true)
                     _uiState.value = AuthUiState.Verified(result.user!!.uid)
                 } else {
@@ -370,10 +372,38 @@ class AuthViewModel @Inject constructor(
                         // Link phone credential if it's first login verification
                         user.linkWithCredential(credential).await()
                         
-                        // Update isFirstLogin flag in Firestore
-                        firestore.collection("users").document(user.uid)
-                            .update("isFirstLogin", false)
-                            .await()
+                        // Check if we need to migrate document from regNo to UID
+                        val userByUid = firestore.collection("users").document(user.uid).get().await()
+                        if (!userByUid.exists()) {
+                            // Document might be stored under regNo (Admin created)
+                            // We need to find it and migrate
+                            val usersByPhone = firestore.collection("users")
+                                .whereEqualTo("phoneNumber", user.phoneNumber ?: "")
+                                .get()
+                                .await()
+                            
+                            val adminCreatedDoc = usersByPhone.documents.firstOrNull { 
+                                it.getBoolean("isFirstLogin") == true 
+                            }
+
+                            if (adminCreatedDoc != null) {
+                                val data = adminCreatedDoc.data?.toMutableMap() ?: mutableMapOf()
+                                data["id"] = user.uid
+                                data["isFirstLogin"] = false
+                                data["updatedAt"] = System.currentTimeMillis()
+                                
+                                // Create new document with UID
+                                firestore.collection("users").document(user.uid).set(data).await()
+                                
+                                // Delete old document (regNo based)
+                                firestore.collection("users").document(adminCreatedDoc.id).delete().await()
+                            }
+                        } else {
+                            // Document already exists under UID, just update flag
+                            firestore.collection("users").document(user.uid)
+                                .update("isFirstLogin", false)
+                                .await()
+                        }
                     } catch (e: Exception) {
                         // If user is already linked to this phone, we just proceed
                         // This happens on subsequent logins where MFA is required but already linked
@@ -385,11 +415,13 @@ class AuthViewModel @Inject constructor(
                         }
                     }
                         
-                    _uiState.value = AuthUiState.Verified(user.uid)
+                    userRepository.syncUserData(user.uid)
                     onboardingDataStore.setOnboardingCompleted(true)
+                    _uiState.value = AuthUiState.Verified(user.uid)
                 } else {
                     val result = auth.signInWithCredential(credential).await()
                     if (result.user != null) {
+                        userRepository.syncUserData(result.user!!.uid)
                         onboardingDataStore.setOnboardingCompleted(true)
                         _uiState.value = AuthUiState.Verified(result.user!!.uid)
                     } else {

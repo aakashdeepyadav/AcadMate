@@ -43,6 +43,7 @@ fun AdminDashboardScreen(
     viewModel: AdminViewModel = hiltViewModel(),
     onAddUserClick: () -> Unit,
     onManageCoursesClick: () -> Unit = {},
+    onScheduleClick: () -> Unit = {},
     onAuditLogClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
     onSignOut: () -> Unit = {}
@@ -198,6 +199,7 @@ fun AdminDashboardScreen(
                         QuickActionsGrid(
                             onAddUser = onAddUserClick,
                             onManageCourses = onManageCoursesClick,
+                            onSchedule = onScheduleClick,
                             onPostAnnouncement = { showAnnouncementDialog = true },
                             onAuditLog = onAuditLogClick,
                             onSettingsClick = onSettingsClick,
@@ -248,6 +250,7 @@ fun AdminDashboardScreen(
 fun QuickActionsGrid(
     onAddUser: () -> Unit,
     onManageCourses: () -> Unit,
+    onSchedule: () -> Unit,
     onPostAnnouncement: () -> Unit,
     onAuditLog: () -> Unit,
     onSettingsClick: () -> Unit,
@@ -256,9 +259,9 @@ fun QuickActionsGrid(
     val actions = listOf(
         QuickAction("User Mgmt", Icons.Default.People, Color(0xFF6C5CE7), onAddUser),
         QuickAction("Course Mgmt", Icons.Default.Class, Color(0xFF00B894), onManageCourses),
-        QuickAction("Announcements", Icons.Default.Campaign, Color(0xFFE17055), onPostAnnouncement),
+        QuickAction("Schedule", Icons.Default.CalendarMonth, Color(0xFFE17055), onSchedule),
+        QuickAction("Announcements", Icons.Default.Campaign, Color(0xFF0984E3), onPostAnnouncement),
         QuickAction("Audit Logs", Icons.Default.Shield, Color(0xFF2D3436), onAuditLog),
-        QuickAction("Reports", Icons.Default.Description, Color(0xFF0984E3), { onComingSoon("Reports") }),
         QuickAction("Settings", Icons.Default.Settings, Color(0xFF636E72), onSettingsClick)
     )
 

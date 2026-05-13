@@ -125,7 +125,7 @@ class StudentHomeViewModel @Inject constructor(
                         studentEmail = it.email,
                         studentPhone = it.phoneNumber,
                         studentEnrollment = it.regNo ?: "N/A",
-                        studentDepartment = "B.Tech CSE (6th Sem)",
+                        studentDepartment = it.department ?: "General",
                         studentRole = it.role.name,
                         studentAddress = it.address ?: "N/A",
                         profilePictureUrl = it.profilePictureUrl
@@ -201,7 +201,7 @@ class StudentHomeViewModel @Inject constructor(
                         ScheduleItem(
                             id = entity.id,
                             subject = entity.subject,
-                            faculty = entity.faculty,
+                            faculty = if (entity.faculty.isBlank()) "Not Assigned" else entity.faculty,
                             room = entity.room,
                             time = "${entity.startTime} - ${entity.endTime}",
                             isCurrent = activeSession?.getString("classId") == entity.subject

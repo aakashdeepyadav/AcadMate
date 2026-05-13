@@ -152,4 +152,7 @@ sealed class Routes {
 
     @Serializable
     object CourseManagement
+
+    @Serializable
+    object TimetableManagement
 }

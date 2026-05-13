@@ -4,7 +4,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -32,6 +34,8 @@ import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.launch
 
+import com.acadmate.core.model.Subject
+
 data class Course(
     val id: String = "",
     val name: String = "",
@@ -46,6 +50,9 @@ class AdminCourseViewModel : ViewModel() {
     private val _courses = mutableStateListOf<Course>()
     val courses: List<Course> get() = _courses
     
+    private val _subjects = mutableStateListOf<Subject>()
+    val subjects: List<Subject> get() = _subjects
+    
     private val _facultyList = mutableStateListOf<String>()
     val facultyList: List<String> get() = _facultyList
     
@@ -55,6 +62,29 @@ class AdminCourseViewModel : ViewModel() {
     init {
         loadCourses()
         loadFaculty()
+        loadSubjects()
+    }
+
+    private fun loadSubjects() {
+        viewModelScope.launch {
+            try {
+                val snapshot = firestore.collection("subjects").get().await()
+                val subjectList = snapshot.toObjects(Subject::class.java)
+                _subjects.clear()
+                _subjects.addAll(subjectList)
+            } catch (e: Exception) {}
+        }
+    }
+
+    fun addSubject(name: String, code: String, dept: String) {
+        viewModelScope.launch {
+            try {
+                val id = firestore.collection("subjects").document().id
+                val newSubject = Subject(id, name, code, dept)
+                firestore.collection("subjects").document(id).set(newSubject).await()
+                _subjects.add(newSubject)
+            } catch (e: Exception) {}
+        }
     }
 
     private fun loadFaculty() {
@@ -133,16 +163,20 @@ fun CourseManagementScreen(
     onBackClick: () -> Unit
 ) {
     var showCourseDialog by remember { mutableStateOf(false) }
+    var showSubjectDialog by remember { mutableStateOf(false) }
     var editingCourse by remember { mutableStateOf<Course?>(null) }
+    var selectedFilter by remember { mutableStateOf<Subject?>(null) }
 
     if (showCourseDialog) {
         CourseDialog(
             course = editingCourse,
+            subjects = viewModel.subjects,
             facultyList = viewModel.facultyList,
             onDismiss = { 
                 showCourseDialog = false
                 editingCourse = null
             },
+            onAddSubjectClick = { showSubjectDialog = true },
             onSave = { name, code, dept, credits, faculty ->
                 if (editingCourse != null) {
                     viewModel.updateCourse(editingCourse!!.copy(
@@ -157,6 +191,16 @@ fun CourseManagementScreen(
                 }
                 showCourseDialog = false
                 editingCourse = null
+            }
+        )
+    }
+
+    if (showSubjectDialog) {
+        SubjectDialog(
+            onDismiss = { showSubjectDialog = false },
+            onSave = { name, code, dept ->
+                viewModel.addSubject(name, code, dept)
+                showSubjectDialog = false
             }
         )
     }
@@ -182,13 +226,22 @@ fun CourseManagementScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showCourseDialog = true },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = Color.White,
-                elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 6.dp)
-            ) {
-                Icon(Icons.Default.LibraryAdd, contentDescription = "Add Course")
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp), horizontalAlignment = Alignment.End) {
+                SmallFloatingActionButton(
+                    onClick = { showSubjectDialog = true },
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.secondary
+                ) {
+                    Icon(Icons.Default.LibraryAdd, contentDescription = "Add Subject")
+                }
+                FloatingActionButton(
+                    onClick = { showCourseDialog = true },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = Color.White,
+                    elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 6.dp)
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Add Course")
+                }
             }
         },
         containerColor = MaterialTheme.colorScheme.background
@@ -219,6 +272,15 @@ fun CourseManagementScreen(
                 )
             }
 
+            // Subject Filter Chips (Optional but good UX)
+            if (viewModel.subjects.isNotEmpty()) {
+                SubjectFilterChips(
+                    subjects = viewModel.subjects,
+                    selectedSubject = selectedFilter,
+                    onSubjectSelected = { selectedFilter = it }
+                )
+            }
+
             // Course List
             if (viewModel.isLoading.value) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -234,7 +296,13 @@ fun CourseManagementScreen(
                     ),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    items(viewModel.courses) { course ->
+                    val filteredCourses = if (selectedFilter == null) {
+                        viewModel.courses
+                    } else {
+                        viewModel.courses.filter { it.name == selectedFilter?.name }
+                    }
+
+                    items(filteredCourses) { course ->
                         CourseItemCard(
                             course = course, 
                             onEditClick = { 
@@ -254,15 +322,17 @@ fun CourseManagementScreen(
 @Composable
 fun CourseDialog(
     course: Course? = null,
+    subjects: List<Subject>,
     facultyList: List<String>,
     onDismiss: () -> Unit,
+    onAddSubjectClick: () -> Unit,
     onSave: (String, String, String, Int, String?) -> Unit
 ) {
-    var name by remember { mutableStateOf(course?.name ?: "") }
-    var code by remember { mutableStateOf(course?.code ?: "") }
-    var dept by remember { mutableStateOf(course?.department ?: "") }
+    var selectedSubject by remember { mutableStateOf(subjects.find { it.name == course?.name }) }
     var credits by remember { mutableStateOf(course?.credits?.toString() ?: "4") }
     var selectedFaculty by remember { mutableStateOf<String?>(course?.assignedFaculty) }
+    
+    var subjectExpanded by remember { mutableStateOf(false) }
     var facultyExpanded by remember { mutableStateOf(false) }
 
     Dialog(onDismissRequest = onDismiss) {
@@ -275,41 +345,57 @@ fun CourseDialog(
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text(
-                    text = if (course == null) "Add New Course" else "Edit Course",
+                    text = if (course == null) "Launch New Course" else "Edit Course Instance",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
                 
-                AcadMateTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = "Course Name",
-                    placeholder = "e.g. Algorithms"
-                )
-                
-                AcadMateTextField(
-                    value = code,
-                    onValueChange = { code = it },
-                    label = "Course Code",
-                    placeholder = "e.g. CS201"
-                )
-
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    AcadMateTextField(
-                        value = dept,
-                        onValueChange = { dept = it },
-                        label = "Department",
-                        placeholder = "e.g. CS",
-                        modifier = Modifier.weight(1f)
-                    )
-                    AcadMateTextField(
-                        value = credits,
-                        onValueChange = { if (it.all { c -> c.isDigit() }) credits = it },
-                        label = "Credits",
-                        placeholder = "4",
-                        modifier = Modifier.weight(0.5f)
-                    )
+                // Subject Dropdown
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    ExposedDropdownMenuBox(
+                        expanded = subjectExpanded,
+                        onExpandedChange = { subjectExpanded = !subjectExpanded }
+                    ) {
+                        AcadMateTextField(
+                            value = selectedSubject?.name ?: "Select Subject",
+                            onValueChange = {},
+                            readOnly = true,
+                            label = "Course Subject",
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = subjectExpanded) },
+                            modifier = Modifier.menuAnchor().fillMaxWidth()
+                        )
+                        ExposedDropdownMenu(
+                            expanded = subjectExpanded,
+                            onDismissRequest = { subjectExpanded = false }
+                        ) {
+                            subjects.forEach { subject ->
+                                DropdownMenuItem(
+                                    text = { Text("${subject.name} (${subject.code})") },
+                                    onClick = {
+                                        selectedSubject = subject
+                                        subjectExpanded = false
+                                    }
+                                )
+                            }
+                            HorizontalDivider()
+                            DropdownMenuItem(
+                                text = { Text("+ Add New Subject", color = MaterialTheme.colorScheme.primary) },
+                                onClick = {
+                                    subjectExpanded = false
+                                    onAddSubjectClick()
+                                }
+                            )
+                        }
+                    }
                 }
+
+                AcadMateTextField(
+                    value = credits,
+                    onValueChange = { if (it.all { c -> c.isDigit() }) credits = it },
+                    label = "Credits",
+                    placeholder = "4",
+                    modifier = Modifier.fillMaxWidth()
+                )
 
                 // Faculty Dropdown
                 Box(modifier = Modifier.fillMaxWidth()) {
@@ -323,7 +409,7 @@ fun CourseDialog(
                             readOnly = true,
                             label = "Assign Faculty",
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = facultyExpanded) },
-                            modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth()
+                            modifier = Modifier.menuAnchor().fillMaxWidth()
                         )
                         ExposedDropdownMenu(
                             expanded = facultyExpanded,
@@ -361,10 +447,50 @@ fun CourseDialog(
                     }
                     
                     AcadMateButton(
-                        text = if (course == null) "Add Course" else "Update Course",
-                        onClick = { onSave(name, code, dept, credits.toIntOrNull() ?: 4, selectedFaculty) },
+                        text = if (course == null) "Create Course" else "Update",
+                        onClick = { 
+                            selectedSubject?.let {
+                                onSave(it.name, it.code, it.department, credits.toIntOrNull() ?: 4, selectedFaculty) 
+                            }
+                        },
                         modifier = Modifier.weight(1f),
-                        enabled = name.isNotBlank() && code.isNotBlank() && dept.isNotBlank()
+                        enabled = selectedSubject != null
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SubjectDialog(
+    onDismiss: () -> Unit,
+    onSave: (String, String, String) -> Unit
+) {
+    var name by remember { mutableStateOf("") }
+    var code by remember { mutableStateOf("") }
+    var dept by remember { mutableStateOf("") }
+
+    Dialog(onDismissRequest = onDismiss) {
+        AcadMateCard(
+            variant = CardVariant.Elevated,
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            contentPadding = 20.dp
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text("Add Master Subject", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                
+                AcadMateTextField(value = name, onValueChange = { name = it }, label = "Subject Name")
+                AcadMateTextField(value = code, onValueChange = { code = it }, label = "Subject Code")
+                AcadMateTextField(value = dept, onValueChange = { dept = it }, label = "Department")
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    TextButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("Cancel") }
+                    AcadMateButton(
+                        text = "Add", 
+                        onClick = { onSave(name, code, dept) },
+                        modifier = Modifier.weight(1f),
+                        enabled = name.isNotBlank() && code.isNotBlank()
                     )
                 }
             }
@@ -394,6 +520,36 @@ fun StatsCard(title: String, value: String, color: Color = MaterialTheme.colorSc
                     letterSpacing = (-1).sp
                 ),
                 color = color
+            )
+        }
+    }
+}
+
+@Composable
+fun SubjectFilterChips(
+    subjects: List<Subject>,
+    selectedSubject: Subject?,
+    onSubjectSelected: (Subject?) -> Unit
+) {
+    LazyRow(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        item {
+            FilterChip(
+                selected = selectedSubject == null,
+                onClick = { onSubjectSelected(null) },
+                label = { Text("All Subjects") }
+            )
+        }
+        items(
+            items = subjects,
+            key = { it.id }
+        ) { subject ->
+            FilterChip(
+                selected = selectedSubject?.id == subject.id,
+                onClick = { onSubjectSelected(subject) },
+                label = { Text(subject.name) }
             )
         }
     }
