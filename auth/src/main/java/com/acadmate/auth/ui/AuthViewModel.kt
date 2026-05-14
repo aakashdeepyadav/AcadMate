@@ -107,15 +107,9 @@ class AuthViewModel @Inject constructor(
                     return@launch
                 }
 
-                // Role-Specific Validation
+                // Registration Number Validation
                 if (!ValidationUtils.isValidRegistrationNumber(cleanRegNo, selectedRole)) {
                     _uiState.value = AuthUiState.Error(ValidationUtils.getRegistrationNumberErrorMessage(selectedRole))
-                    return@launch
-                }
-
-                // Password Strength Validation
-                if (!ValidationUtils.isStrongPassword(cleanPass)) {
-                    _uiState.value = AuthUiState.Error(ValidationUtils.getPasswordStrengthErrorMessage())
                     return@launch
                 }
 
@@ -172,17 +166,20 @@ class AuthViewModel @Inject constructor(
                     }
                 } catch (e: Exception) {
                     val errorMsg = when {
-                        e.message?.contains("password") == true -> "Incorrect password. Please try again."
-                        e.message?.contains("user-not-found") == true -> "No account found for this email."
+                        e.message?.contains("password", ignoreCase = true) == true || 
+                        e.message?.contains("credential", ignoreCase = true) == true -> "Incorrect password. Please check your credentials."
+                        e.message?.contains("user-not-found", ignoreCase = true) == true ||
+                        e.message?.contains("no user record", ignoreCase = true) == true -> "No account found for this institutional ID."
                         else -> e.message ?: "Authentication failed"
                     }
                     _uiState.value = AuthUiState.Error(errorMsg)
                 }
             } catch (e: Exception) {
                 val errorMsg = when {
-                    e.message?.contains("password") == true -> "Incorrect password. Please try again."
-                    e.message?.contains("user-not-found") == true -> "No account found for this email."
-                    else -> e.message ?: "Authentication failed"
+                    e.message?.contains("password", ignoreCase = true) == true ||
+                    e.message?.contains("credential", ignoreCase = true) == true -> "Incorrect password. Please check your credentials."
+                    e.message?.contains("user-not-found", ignoreCase = true) == true -> "Account record missing."
+                    else -> e.message ?: "Login failed"
                 }
                 _uiState.value = AuthUiState.Error(errorMsg)
             }
