@@ -30,6 +30,9 @@ class OnboardingDataStore @Inject constructor(
     private val assignmentRemindersEnabledKey = booleanPreferencesKey("assignment_reminders_enabled")
     private val examNotificationsEnabledKey = booleanPreferencesKey("exam_notifications_enabled")
     private val smartInsightsEnabledKey = booleanPreferencesKey("smart_insights_enabled")
+    private val alarmToneKey = stringPreferencesKey("alarm_tone")
+    private val alarmVibrationEnabledKey = booleanPreferencesKey("alarm_vibration_enabled")
+    private val alarmVolumeKey = stringPreferencesKey("alarm_volume")
 
     val selectedRole: Flow<UserRole?> = context.dataStore.data.map { preferences ->
         preferences[selectedRoleKey]?.let { UserRole.fromString(it) }
@@ -77,6 +80,18 @@ class OnboardingDataStore @Inject constructor(
         preferences[smartInsightsEnabledKey] ?: false
     }
 
+    val alarmTone: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[alarmToneKey] ?: "Default"
+    }
+
+    val alarmVibrationEnabled: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[alarmVibrationEnabledKey] ?: true
+    }
+
+    val alarmVolume: Flow<Int> = context.dataStore.data.map { preferences ->
+        preferences[alarmVolumeKey]?.toIntOrNull() ?: 70
+    }
+
     suspend fun setAutoAlarmsEnabled(enabled: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[autoAlarmsEnabledKey] = enabled
@@ -104,6 +119,24 @@ class OnboardingDataStore @Inject constructor(
     suspend fun setSmartInsightsEnabled(enabled: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[smartInsightsEnabledKey] = enabled
+        }
+    }
+
+    suspend fun setAlarmTone(tone: String) {
+        context.dataStore.edit { preferences ->
+            preferences[alarmToneKey] = tone
+        }
+    }
+
+    suspend fun setAlarmVibrationEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[alarmVibrationEnabledKey] = enabled
+        }
+    }
+
+    suspend fun setAlarmVolume(volume: Int) {
+        context.dataStore.edit { preferences ->
+            preferences[alarmVolumeKey] = volume.toString()
         }
     }
 

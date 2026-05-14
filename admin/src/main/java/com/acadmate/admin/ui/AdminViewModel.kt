@@ -101,10 +101,19 @@ class AdminViewModel @Inject constructor(
                         .await()
                         .size()
                     
-                    // Calculate average attendance across all students
+                    // Calculate real average attendance across all students
                     val attendanceSnapshot = firestore.collection("attendance").get().await()
-                    val totalRecords = attendanceSnapshot.size()
-                    val avgAttendance = if (totalRecords > 0) (80f + (totalRecords % 15)) else 0f
+                    val studentsSnapshotForAvg = firestore.collection("users").whereEqualTo("role", UserRole.STUDENT.name).get().await()
+                    val totalPossibleAttendances = studentsSnapshotForAvg.size().coerceAtLeast(1)
+                    
+                    val calendar = java.util.Calendar.getInstance()
+                    val dateStr = "${calendar.get(java.util.Calendar.YEAR)}-${calendar.get(java.util.Calendar.MONTH) + 1}-${calendar.get(java.util.Calendar.DAY_OF_MONTH)}"
+                    
+                    val uniqueMarkedToday = attendanceSnapshot.documents.filter { 
+                        it.getString("date") == dateStr
+                    }.distinctBy { it.getString("studentId") }.size
+                    
+                    val avgAttendance = (uniqueMarkedToday.toFloat() / totalPossibleAttendances) * 100f
 
                     // Fetch recent logs from Firestore
                     val actionsSnapshot = firestore.collection("admin_logs")
@@ -210,6 +219,33 @@ class AdminViewModel @Inject constructor(
                 loadAdminDashboard() // Refresh stats
             } catch (e: Exception) {
                 _uiState.value = AdminUiState.Error("Failed to create user: ${e.message}")
+            }
+        }
+    }
+
+    fun updateUser(
+        userId: String,
+        name: String,
+        email: String,
+        role: UserRole,
+        phoneNumber: String
+    ) {
+        viewModelScope.launch {
+            try {
+                val userData = hashMapOf<String, Any>(
+                    "name" to name,
+                    "email" to email,
+                    "role" to role.name,
+                    "phoneNumber" to phoneNumber,
+                    "updatedAt" to System.currentTimeMillis()
+                )
+                
+                firestore.collection("users").document(userId).update(userData).await()
+                
+                loadUsers() // Refresh list
+                loadAdminDashboard() // Refresh stats
+            } catch (e: Exception) {
+                _uiState.value = AdminUiState.Error("Failed to update user: ${e.message}")
             }
         }
     }

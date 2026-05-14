@@ -62,6 +62,7 @@ fun ProfileScreen(
     onPushNotificationsClick: () -> Unit = {},
     isDarkMode: Boolean = false,
     onDarkModeToggle: (Boolean) -> Unit = {},
+    userRole: com.acadmate.core.model.UserRole? = null,
     viewModel: ProfileViewModel = androidx.hilt.navigation.compose.hiltViewModel()
 ) {
     val uiState by viewModel.profileUiState.collectAsState()
@@ -69,6 +70,11 @@ fun ProfileScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val updateState by viewModel.updateState.collectAsState()
     
+    // Determine which sections to show based on role
+    val isStudent = userRole == com.acadmate.core.model.UserRole.STUDENT
+    val isFaculty = userRole == com.acadmate.core.model.UserRole.FACULTY
+    val isAdmin = userRole == com.acadmate.core.model.UserRole.ADMIN
+
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
@@ -230,47 +236,48 @@ fun ProfileScreen(
                         )
                     }
 
-                    // ── Attendance Overview Card ─────────────────────────────────────
-                    AcadMateCard(
-                        variant = CardVariant.Flat,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = LocalSpacing.current.md)
-                    ) {
-                        Column {
-                            Text(
-                                text = "ATTENDANCE OVERVIEW",
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    letterSpacing = 1.2.sp
-                                ),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.height(LocalSpacing.current.md))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceEvenly
-                            ) {
-                                StatColumn(
-                                    value = "${(uiState.overallAttendance * 100).toInt()}%",
-                                    label = "Overall",
-                                    color = MaterialTheme.colorScheme.primary
+                    // ── Attendance Overview Card (Only for Students/Faculty) ─────────
+                    if (!isAdmin) {
+                        AcadMateCard(
+                            variant = CardVariant.Flat,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = LocalSpacing.current.md)
+                        ) {
+                            Column {
+                                Text(
+                                    text = if (isFaculty) "FACULTY OVERVIEW" else "ATTENDANCE OVERVIEW",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = 1.2.sp
+                                    ),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
-                                StatColumn(
-                                    value = uiState.classesAttended.toString(),
-                                    label = "Attended",
-                                    color = MaterialTheme.colorScheme.secondary
-                                )
-                                StatColumn(
-                                    value = uiState.classesMissed.toString(),
-                                    label = "Missed",
-                                    color = MaterialTheme.colorScheme.error
-                                )
+                                Spacer(modifier = Modifier.height(LocalSpacing.current.md))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceEvenly
+                                ) {
+                                    StatColumn(
+                                        value = "${(uiState.overallAttendance * 100).toInt()}%",
+                                        label = if (isFaculty) "Classes Taken" else "Overall",
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    StatColumn(
+                                        value = uiState.classesAttended.toString(),
+                                        label = if (isFaculty) "Active" else "Attended",
+                                        color = MaterialTheme.colorScheme.secondary
+                                    )
+                                    StatColumn(
+                                        value = uiState.classesMissed.toString(),
+                                        label = if (isFaculty) "Pending" else "Missed",
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                }
                             }
                         }
+                        Spacer(modifier = Modifier.height(LocalSpacing.current.lg))
                     }
-
-                    Spacer(modifier = Modifier.height(LocalSpacing.current.lg))
 
                     // ── Personal Information Card ────────────────────────────────────
                     AcadMateCard(
@@ -292,25 +299,27 @@ fun ProfileScreen(
                             InfoRow("Phone", uiState.phone)
                             InfoRow("Email", uiState.email)
                             InfoRow("Address", uiState.address)
-                            InfoRow("Enrollment", uiState.enrollment)
-                            InfoRow("Department", uiState.department)
+                            if (!isAdmin) {
+                                InfoRow(if (isFaculty) "Employee ID" else "Enrollment", uiState.enrollment)
+                                InfoRow("Department", uiState.department)
+                            }
                             InfoRow("Role", uiState.role, isLast = true)
                         }
                     }
 
                     Spacer(modifier = Modifier.height(LocalSpacing.current.lg))
 
-                    // ── Quick Actions ────────────────────────────────────────────────
+                    // ── Quick Actions ───────────────────────────────
                     Column(modifier = Modifier.padding(horizontal = LocalSpacing.current.md)) {
                         SectionHeader(title = "Quick Actions")
-                        Spacer(modifier = Modifier.height(LocalSpacing.current.sm))
+                        Spacer(modifier = Modifier.height(LocalSpacing.current.smd))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(LocalSpacing.current.smd)
                         ) {
                             ProfileQuickAction(
                                 icon = Icons.Default.Notifications,
-                                label = "Notifications",
+                                label = "Notifs",
                                 modifier = Modifier.weight(1f),
                                 onClick = onNotificationsClick
                             )

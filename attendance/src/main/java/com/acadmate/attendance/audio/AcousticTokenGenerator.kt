@@ -40,6 +40,7 @@ class AcousticTokenGenerator @Inject constructor() {
         )
 
         audioTrack?.write(buffer, 0, numSamples)
+        audioTrack?.setLoopPoints(0, numSamples, -1) // Loop infinitely
         audioTrack?.play()
     }
 

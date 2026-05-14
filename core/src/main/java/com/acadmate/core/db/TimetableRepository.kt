@@ -78,6 +78,35 @@ class TimetableRepository @Inject constructor(
         timetableDao.insertTimetable(slots)
     }
 
+    suspend fun syncGlobalTimetable() {
+        try {
+            val snapshot = firestore.collection("global_timetable")
+                .get()
+                .await()
+
+            val remoteItems = snapshot.documents.mapNotNull { doc ->
+                TimetableEntity(
+                    id = doc.id,
+                    dayOfWeek = doc.getLong("dayOfWeek")?.toInt() ?: 1,
+                    subject = doc.getString("subject") ?: "",
+                    faculty = doc.getString("faculty") ?: "",
+                    startTime = doc.getString("startTime") ?: "",
+                    endTime = doc.getString("endTime") ?: "",
+                    room = doc.getString("room") ?: "",
+                    color = doc.getLong("color")?.toInt() ?: 0xFF4A90E2.toInt(),
+                    isAlarmSet = false // Alarms are local to the user
+                )
+            }
+
+            if (remoteItems.isNotEmpty()) {
+                timetableDao.clearTimetable()
+                timetableDao.insertTimetable(remoteItems)
+            }
+        } catch (e: Exception) {
+            // Log error
+        }
+    }
+
     suspend fun syncTimetable(userId: String) {
         try {
             val snapshot = firestore.collection("users")

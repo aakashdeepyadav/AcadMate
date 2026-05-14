@@ -343,18 +343,6 @@ fun TimetableEntryCard(
                         tint = if (isAlarmSet) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
                     )
                 }
-
-                IconButton(onClick = { /* Handle class action */ }) {
-                    Icon(
-                        imageVector = when {
-                            entry.isCurrent -> Icons.Default.PlayArrow
-                            entry.isCompleted -> Icons.Default.CheckCircle
-                            else -> Icons.AutoMirrored.Filled.KeyboardArrowRight
-                        },
-                        contentDescription = "Class action",
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
             }
         }
     }
@@ -388,18 +376,10 @@ fun EmptyTimetableState(day: String) {
         Spacer(modifier = Modifier.height(LocalSpacing.current.sm))
 
         Text(
-            text = "Enjoy your free day or add classes to your timetable",
+            text = "Enjoy your free time or review your study materials.",
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
-        )
-
-        Spacer(modifier = Modifier.height(LocalSpacing.current.lg))
-
-        AcadMateButton(
-            text = "Add Class",
-            onClick = { /* Navigate to add class */ },
-            icon = Icons.Default.Add
         )
     }
 }

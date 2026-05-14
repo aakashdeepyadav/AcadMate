@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
@@ -22,24 +23,24 @@ import java.util.Locale
 import java.util.Calendar
 
 data class HomeUiState(
-    val studentName: String = "",
+    val studentName: String = "Loading...",
     val studentEmail: String = "",
     val studentPhone: String = "",
     val studentEnrollment: String = "",
     val studentDepartment: String = "",
     val studentRole: String = "",
     val studentAddress: String = "N/A",
-    val attendancePercentage: Float = 0.78f,
-    val nextClass: String = "Data Structures",
-    val nextClassIn: String = "45 min",
-    val cgpaEstimate: Float = 8.4f,
+    val attendancePercentage: Float = 0f,
+    val nextClass: String = "No Active Class",
+    val nextClassIn: String = "--",
+    val cgpaEstimate: Float = 0f,
     val isRefreshing: Boolean = false,
     val schedule: List<ScheduleItem> = emptyList(),
     val insights: List<AiInsight> = emptyList(),
     val deadlines: List<Deadline> = emptyList(),
     val courseProgress: Map<String, Float> = emptyMap(),
     val profilePictureUrl: String? = null,
-    val smartSuggestion: String? = "You have an hour free. Revise 'Database Normalization' for your next class?",
+    val smartSuggestion: String? = "Stay ahead! Review your syllabus progress today.",
     val freeTimeUtilization: String? = null
 )
 
@@ -77,7 +78,7 @@ class StudentHomeViewModel @Inject constructor(
     private val auth = FirebaseAuth.getInstance()
 
     private val _uiState = MutableStateFlow(HomeUiState(
-        studentName = auth.currentUser?.displayName ?: "Student",
+        studentName = auth.currentUser?.displayName ?: "Loading...",
         studentEmail = auth.currentUser?.email ?: "",
         studentPhone = auth.currentUser?.phoneNumber ?: ""
     ))
@@ -89,12 +90,9 @@ class StudentHomeViewModel @Inject constructor(
         calculateSmartFreeTime()
         prefetchTabData()
         
-        // Initialize 6th Sem Timetable if not already set
+        // Sync Global Timetable from Firestore
         viewModelScope.launch {
-            val current = timetableRepository.getTimetableForDaySync(1)
-            if (current.isEmpty()) {
-                timetableRepository.initializeSixthSemTimetable()
-            }
+            timetableRepository.syncGlobalTimetable()
         }
     }
 
@@ -118,6 +116,10 @@ class StudentHomeViewModel @Inject constructor(
 
     private fun loadUserData() {
         viewModelScope.launch {
+            val userId = auth.currentUser?.uid ?: return@launch
+            // Trigger sync first to ensure local data is up to date
+            userRepository.syncUserData(userId)
+            
             userRepository.getCurrentUser().collectLatest { user ->
                 user?.let {
                     _uiState.value = _uiState.value.copy(
@@ -138,17 +140,19 @@ class StudentHomeViewModel @Inject constructor(
     fun loadDashboardData() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isRefreshing = true)
-            val userId = auth.currentUser?.uid ?: return@launch
+            
+            val user = userRepository.getCurrentUser().first()
+            val regNo = user?.regNo ?: return@launch
 
             try {
-                // Fetch Attendance Stats
+                // Fetch Attendance Stats using regNo
                 val attendanceTask = firestore.collection("attendance")
-                    .whereEqualTo("studentId", userId)
+                    .whereEqualTo("studentId", regNo)
                     .get()
                     .await()
                 
                 val attendedCount = attendanceTask.size()
-                val attendancePercentage = if (attendedCount > 0) (attendedCount / 136f).coerceIn(0f, 1f) else 0.78f
+                val attendancePercentage = if (attendedCount > 0) (attendedCount / 136f).coerceIn(0f, 1f) else 0f
 
                 // Fetch Upcoming Assignments
                 val assignmentsTask = firestore.collection("assignments")

@@ -43,6 +43,9 @@ sealed class Routes {
     data class MarkAttendance(val classId: String)
 
     @Serializable
+    object ActiveSessionsBrowser
+
+    @Serializable
     object AiSuite
 
     @Serializable
@@ -53,6 +56,9 @@ sealed class Routes {
 
     @Serializable
     object SyllabusBrowser
+
+    @Serializable
+    object ManageSyllabus
 
     @Serializable
     object SyllabusResult
@@ -155,4 +161,7 @@ sealed class Routes {
 
     @Serializable
     object TimetableManagement
+
+    @Serializable
+    object AiTimetableGenerator
 }

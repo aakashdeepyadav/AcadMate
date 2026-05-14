@@ -1,11 +1,14 @@
 package com.acadmate.attendance.ui.screens
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bluetooth
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Podcasts
+import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import kotlinx.coroutines.delay
@@ -20,28 +23,28 @@ import com.acadmate.designsystem.components.AcadMateButton
 import com.acadmate.designsystem.components.AcadMateCard
 import com.acadmate.designsystem.components.CardVariant
 import com.acadmate.designsystem.components.MeshBackground
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.draw.alpha
-import androidx.compose.foundation.Canvas
-import com.acadmate.designsystem.theme.LocalSpacing
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import coil.compose.AsyncImage
+import androidx.compose.ui.layout.ContentScale
+import com.acadmate.attendance.domain.StudentAttendanceRecord
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FacultyMarkAttendanceScreen(
     classId: String,
     onBackClick: () -> Unit,
+    onViewAttendanceClick: (String) -> Unit = {},
     viewModel: FacultyAttendanceViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val isBroadcasting = uiState.isSessionActive
-    var currentSubject by remember { mutableStateOf(classId) }
-    var isEditingSubject by remember { mutableStateOf(false) }
-    var timeLeft by remember { mutableStateOf(600) } // 10 minutes in seconds
+    var timeLeft by remember { mutableStateOf(600) } // 10 minutes
 
     LaunchedEffect(classId) {
         if (!isBroadcasting) {
-            currentSubject = classId
+            viewModel.loadSessionAttendance(classId)
         }
     }
 
@@ -55,133 +58,146 @@ fun FacultyMarkAttendanceScreen(
         }
     }
 
+    val snackbarHostState = remember { SnackbarHostState() }
+    LaunchedEffect(uiState.error) {
+        uiState.error?.let {
+            snackbarHostState.showSnackbar(it)
+        }
+    }
+
     Scaffold(
-        containerColor = Color.Transparent,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text(if (isBroadcasting) "Session Live: $currentSubject" else "Start Session") },
+                title = { Text(if (isBroadcasting) "Live Session: $classId" else "Attendance: $classId") },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent
-                )
+                }
             )
         }
     ) { padding ->
-        MeshBackground(modifier = Modifier.fillMaxSize().padding(padding)) {
-            // Decorative "Poster" Elements for Faculty side
-            FacultyDecorativeElements()
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+        ) {
+            if (isBroadcasting) {
+                // Broadcast Status Card
+                BroadcastStatusCard(
+                    timeLeft = timeLeft,
+                    presentCount = uiState.students.count { it.isPresent },
+                    totalCount = uiState.students.size
+                )
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Text(
+                    text = "Live Student List",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    fontWeight = FontWeight.Bold
+                )
+                
+                // Live Student List
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val presentStudents = uiState.students.filter { it.isPresent }
+                    if (presentStudents.isEmpty()) {
+                        item {
+                            Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                                Text("Waiting for students to mark attendance...", color = Color.Gray)
+                            }
+                        }
+                    }
+                    items(presentStudents) { student ->
+                        LiveStudentItem(student)
+                    }
+                }
+            } else {
+                // Setup Card
+                Box(modifier = Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+                    AcadMateCard(variant = CardVariant.Elevated) {
+                        Column(
+                            modifier = Modifier.padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Icon(Icons.Default.Podcasts, null, modifier = Modifier.size(80.dp), tint = MaterialTheme.colorScheme.primary)
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text("Ready to start attendance?", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                            Text("This will broadcast an ultrasonic signal for 10 minutes.", textAlign = TextAlign.Center, color = Color.Gray)
+                        }
+                    }
+                }
+            }
 
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                if (isBroadcasting) {
+            // Bottom Actions
+            Surface(tonalElevation = 4.dp, modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    AcadMateButton(
+                        text = if (isBroadcasting) "Stop Session" else "Start Session",
+                        onClick = { 
+                            if (isBroadcasting) viewModel.stopAttendanceSession() 
+                            else viewModel.startAttendanceSession(classId) 
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    
+                    if (isBroadcasting) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        TextButton(
+                            onClick = { onViewAttendanceClick(classId) },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Manual Entry / View All Students")
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun BroadcastStatusCard(timeLeft: Int, presentCount: Int, totalCount: Int) {
+    AcadMateCard(
+        variant = CardVariant.Flat,
+        backgroundColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
+        modifier = Modifier.padding(16.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column {
+                Text("Time Remaining", style = MaterialTheme.typography.labelSmall)
+                Text(
+                    text = String.format("%02d:%02d", timeLeft / 60, timeLeft % 60),
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Black,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            
+            Column(horizontalAlignment = Alignment.End) {
+                Text("Presence", style = MaterialTheme.typography.labelSmall)
+                Row(verticalAlignment = Alignment.Bottom) {
                     Text(
-                        text = String.format("%02d:%02d", timeLeft / 60, timeLeft % 60),
-                        style = MaterialTheme.typography.displayLarge,
+                        text = "$presentCount",
+                        style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Black,
                         color = MaterialTheme.colorScheme.primary
                     )
                     Text(
-                        "Remaining Time",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(32.dp))
-                }
-
-                AcadMateCard(
-                    variant = CardVariant.Elevated,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(
-                        modifier = Modifier.padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        if (!isBroadcasting) {
-                            if (isEditingSubject) {
-                                OutlinedTextField(
-                                    value = currentSubject,
-                                    onValueChange = { currentSubject = it },
-                                    label = { Text("Enter Subject Name") },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    singleLine = true
-                                )
-                                TextButton(onClick = { isEditingSubject = false }) {
-                                    Text("Done")
-                                }
-                            } else {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.Center
-                                ) {
-                                    Text(
-                                        text = currentSubject,
-                                        style = MaterialTheme.typography.headlineSmall,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    IconButton(onClick = { isEditingSubject = true }) {
-                                        Icon(Icons.Default.Edit, contentDescription = "Edit Subject", modifier = Modifier.size(20.dp))
-                                    }
-                                }
-                            }
-                            Spacer(modifier = Modifier.height(16.dp))
-                        }
-
-                        Icon(
-                            imageVector = if (isBroadcasting) Icons.Default.Bluetooth else Icons.Default.Podcasts,
-                            contentDescription = null,
-                            modifier = Modifier.size(120.dp),
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        
-                        Spacer(modifier = Modifier.height(24.dp))
-                        
-                        Text(
-                            text = if (isBroadcasting) "Broadcasting Session..." else "Ready to Start Session",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Center
-                        )
-                        
-                        Spacer(modifier = Modifier.height(16.dp))
-                        
-                        Text(
-                            text = if (isBroadcasting) 
-                                "Students can now mark their attendance for $currentSubject." 
-                                else "Click the button below to start broadcasting the attendance beacon for $currentSubject.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            textAlign = TextAlign.Center,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-                
-                Spacer(modifier = Modifier.height(32.dp))
-                
-                AcadMateButton(
-                    text = if (isBroadcasting) "Stop Session" else "Start Session",
-                    onClick = { 
-                        if (isBroadcasting) viewModel.stopAttendanceSession() 
-                        else viewModel.startAttendanceSession(currentSubject) 
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                
-                if (isBroadcasting) {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        "Session Token: ATT_SESSION_$currentSubject",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Bold
+                        text = "/$totalCount",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Color.Gray,
+                        modifier = Modifier.padding(bottom = 4.dp)
                     )
                 }
             }
@@ -190,22 +206,40 @@ fun FacultyMarkAttendanceScreen(
 }
 
 @Composable
-fun FacultyDecorativeElements() {
-    val primaryColor = MaterialTheme.colorScheme.primary
-    
-    Canvas(modifier = Modifier.fillMaxSize().alpha(0.04f)) {
-        // Abstract geometric pattern
-        val size = 300.dp.toPx()
-        drawRect(
-            color = primaryColor,
-            topLeft = androidx.compose.ui.geometry.Offset(-size/2, -size/2),
-            size = androidx.compose.ui.geometry.Size(size, size)
-        )
-        
-        drawRect(
-            color = primaryColor,
-            topLeft = androidx.compose.ui.geometry.Offset(this.size.width - size/2, this.size.height - size/2),
-            size = androidx.compose.ui.geometry.Size(size, size)
-        )
+fun LiveStudentItem(student: StudentAttendanceRecord) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                modifier = Modifier.size(40.dp).clip(CircleShape),
+                color = MaterialTheme.colorScheme.primaryContainer
+            ) {
+                if (student.profilePictureUrl != null) {
+                    AsyncImage(
+                        model = student.profilePictureUrl,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(student.studentName.take(1))
+                    }
+                }
+            }
+            
+            Spacer(modifier = Modifier.width(12.dp))
+            
+            Column(modifier = Modifier.weight(1f)) {
+                Text(student.studentName, fontWeight = FontWeight.Bold)
+                Text(student.enrollmentNumber, style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+            }
+            
+            Icon(Icons.Default.CheckCircle, null, tint = Color(0xFF10B981))
+        }
     }
 }

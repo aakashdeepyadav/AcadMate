@@ -47,6 +47,7 @@ class AcadMateApplication : Application(), Configuration.Provider {
                 DebugAppCheckProviderFactory.getInstance()
             } else {
                 Log.d("AppCheckSetup", "Running in Release mode - Using Play Integrity")
+                // Use Play Integrity for invisible verification in production.
                 PlayIntegrityAppCheckProviderFactory.getInstance()
             }
 

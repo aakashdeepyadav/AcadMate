@@ -32,6 +32,7 @@ fun CreateUserScreen(
     onBackClick: () -> Unit
 ) {
     var showAddDialog by remember { mutableStateOf(false) }
+    var editingUser by remember { mutableStateOf<UserEntity?>(null) }
     var searchQuery by remember { mutableStateOf("") }
     val users by viewModel.usersList.collectAsState()
     val uiState by viewModel.uiState.collectAsState()
@@ -51,12 +52,21 @@ fun CreateUserScreen(
         }
     }
 
-    if (showAddDialog) {
-        AddUserDialog(
-            onDismiss = { showAddDialog = false },
-            onAdd = { regNo, name, email, role, phone ->
-                viewModel.createInstitutionalUser(regNo, name, email, role, phone)
+    if (showAddDialog || editingUser != null) {
+        UserFormDialog(
+            user = editingUser,
+            onDismiss = { 
                 showAddDialog = false
+                editingUser = null
+            },
+            onSave = { regNo, name, email, role, phone ->
+                if (editingUser != null) {
+                    viewModel.updateUser(editingUser!!.id, name, email, role, phone)
+                } else {
+                    viewModel.createInstitutionalUser(regNo, name, email, role, phone)
+                }
+                showAddDialog = false
+                editingUser = null
             }
         )
     }
@@ -117,6 +127,7 @@ fun CreateUserScreen(
                     items(filteredUsers) { user ->
                         UserListItem(
                             user = user,
+                            onEdit = { editingUser = user },
                             onDelete = { 
                                 viewModel.deleteUser(user.id)
                                 scope.launch { snackbarHostState.showSnackbar("User removed") }
@@ -131,27 +142,29 @@ fun CreateUserScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddUserDialog(
+fun UserFormDialog(
+    user: UserEntity? = null,
     onDismiss: () -> Unit,
-    onAdd: (String, String, String, UserRole, String) -> Unit
+    onSave: (String, String, String, UserRole, String) -> Unit
 ) {
-    var regNo by remember { mutableStateOf("") }
-    var name by remember { mutableStateOf("") }
-    var email by remember { mutableStateOf("") }
-    var phoneNumber by remember { mutableStateOf("") }
-    var selectedRole by remember { mutableStateOf(UserRole.STUDENT) }
+    var regNo by remember { mutableStateOf(user?.regNo ?: "") }
+    var name by remember { mutableStateOf(user?.name ?: "") }
+    var email by remember { mutableStateOf(user?.email ?: "") }
+    var phoneNumber by remember { mutableStateOf(user?.phoneNumber ?: "") }
+    var selectedRole by remember { mutableStateOf(user?.role ?: UserRole.STUDENT) }
     var expanded by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Add New User") },
+        title = { Text(if (user == null) "Add New User" else "Edit User Info") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(LocalSpacing.current.md)) {
                 AcadMateTextField(
                     value = regNo,
                     onValueChange = { if (it.all { char -> char.isDigit() }) regNo = it },
                     label = "Registration Number",
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    readOnly = user != null // Don't allow changing ID during edit
                 )
                 AcadMateTextField(
                     value = name,
@@ -168,7 +181,7 @@ fun AddUserDialog(
                 )
                 AcadMateTextField(
                     value = phoneNumber,
-                    onValueChange = { if (it.all { char -> char.isDigit() } && it.length <= 10) phoneNumber = it },
+                    onValueChange = { if (it.all { char -> char.isDigit() } && it.length <= 13) phoneNumber = it },
                     label = "Phone Number",
                     placeholder = "10-digit mobile",
                     modifier = Modifier.fillMaxWidth(),
@@ -207,8 +220,8 @@ fun AddUserDialog(
         },
         confirmButton = {
             AcadMateButton(
-                text = "Create",
-                onClick = { onAdd(regNo, name, email, selectedRole, phoneNumber) },
+                text = if (user == null) "Create" else "Save Changes",
+                onClick = { onSave(regNo, name, email, selectedRole, phoneNumber) },
                 enabled = regNo.isNotBlank() && name.isNotBlank() && email.isNotBlank()
             )
         },
@@ -219,7 +232,7 @@ fun AddUserDialog(
 }
 
 @Composable
-fun UserListItem(user: UserEntity, onDelete: () -> Unit) {
+fun UserListItem(user: UserEntity, onEdit: () -> Unit, onDelete: () -> Unit) {
     AcadMateCard(variant = CardVariant.Flat, modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(8.dp),
@@ -231,8 +244,13 @@ fun UserListItem(user: UserEntity, onDelete: () -> Unit) {
                 Text(text = "${user.role.name} • ${user.regNo ?: "No ID"}", style = MaterialTheme.typography.bodySmall)
                 Text(text = user.email, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
             }
-            IconButton(onClick = onDelete) {
-                Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
+            Row {
+                IconButton(onClick = onEdit) {
+                    Icon(Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.primary)
+                }
+                IconButton(onClick = onDelete) {
+                    Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
+                }
             }
         }
     }

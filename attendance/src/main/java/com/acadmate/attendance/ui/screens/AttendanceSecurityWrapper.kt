@@ -19,6 +19,7 @@ import com.acadmate.core.ui.SecurityBlockingScreen
 fun AttendanceSecurityWrapper(
     classId: String,
     onNavigateBack: () -> Unit,
+    onGoToProfile: () -> Unit = {},
     attendanceViewModel: AttendanceViewModel = hiltViewModel(),
     securityViewModel: SecurityViewModel = hiltViewModel()
 ) {
@@ -36,7 +37,8 @@ fun AttendanceSecurityWrapper(
         MarkAttendanceScreen(
             viewModel = attendanceViewModel,
             subject = classId,
-            onNavigateBack = onNavigateBack
+            onNavigateBack = onNavigateBack,
+            onGoToProfile = onGoToProfile
         )
     } else {
         val firstViolation = securityState.checks.firstOrNull { it !is SecurityCheckResult.AllClear }

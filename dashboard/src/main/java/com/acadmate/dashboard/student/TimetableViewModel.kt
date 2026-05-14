@@ -20,7 +20,7 @@ import javax.inject.Inject
 @HiltViewModel
 class TimetableViewModel @Inject constructor(
     private val repository: TimetableRepository,
-    private val onboardingDataStore: OnboardingDataStore
+    val onboardingDataStore: OnboardingDataStore
 ) : ViewModel() {
 
     private val auth = FirebaseAuth.getInstance()
@@ -38,16 +38,8 @@ class TimetableViewModel @Inject constructor(
 
     init {
         // Automatically sync from Firestore on load
-        val userId = auth.currentUser?.uid
-        if (userId != null) {
-            viewModelScope.launch {
-                repository.syncTimetable(userId)
-            }
-        } else {
-            // For testing/portfolio, if no user is logged in, we might want to populate dummy CSE data
-            viewModelScope.launch {
-                populateDummyCseDataIfNeeded()
-            }
+        viewModelScope.launch {
+            repository.syncGlobalTimetable()
         }
         
         // Initial load for Current Day
@@ -63,25 +55,6 @@ class TimetableViewModel @Inject constructor(
             else -> "Monday"
         }
         loadTimetableForDay(dayName)
-    }
-
-    private suspend fun populateDummyCseDataIfNeeded() {
-        // We will seed the local DB if it's empty so the portfolio isn't blank
-        val mondayClasses = repository.getTimetableForDaySync(1)
-        if (mondayClasses.isEmpty()) {
-            val cseClasses = listOf(
-                TimetableEntity("1", 1, "Data Structures & Algorithms", "", "09:00", "10:30", "Lab 3", 0),
-                TimetableEntity("2", 1, "Operating Systems", "", "11:00", "12:30", "Room 402", 0),
-                TimetableEntity("3", 1, "Computer Networks", "", "14:00", "15:30", "Room 405", 0),
-                TimetableEntity("4", 2, "Database Management Systems", "", "09:00", "10:30", "Room 301", 0),
-                TimetableEntity("5", 2, "Compiler Design", "", "11:00", "12:30", "Lab 2", 0),
-                TimetableEntity("6", 3, "Artificial Intelligence", "", "10:00", "11:30", "Room 501", 0),
-                TimetableEntity("7", 3, "Software Engineering", "", "13:00", "14:30", "Room 402", 0),
-                TimetableEntity("8", 4, "Data Structures Lab", "", "09:00", "12:00", "Lab 3", 0),
-                TimetableEntity("9", 5, "Computer Networks Lab", "", "14:00", "17:00", "Lab 4", 0)
-            )
-            repository.insertTimetable(cseClasses)
-        }
     }
 
     fun loadTimetableForDay(dayName: String) {

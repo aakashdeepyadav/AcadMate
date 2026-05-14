@@ -27,12 +27,16 @@ import com.acadmate.core.model.SyllabusUnit
 import com.acadmate.designsystem.components.AcadMateCard
 import com.acadmate.designsystem.components.CardVariant
 
+import androidx.hilt.navigation.compose.hiltViewModel
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SyllabusBrowserScreen(
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    viewModel: SyllabusBrowserViewModel = hiltViewModel()
 ) {
     var selectedSubject by remember { mutableStateOf<SubjectSyllabus?>(null) }
+    val uiState by viewModel.uiState.collectAsState()
 
     Scaffold(
         topBar = {
@@ -49,30 +53,49 @@ fun SyllabusBrowserScreen(
         }
     ) { padding ->
         Box(modifier = Modifier.padding(padding).fillMaxSize()) {
-            if (selectedSubject == null) {
-                SubjectList(onSubjectSelect = { selectedSubject = it })
-            } else {
-                UnitList(selectedSubject!!)
+            if (uiState is BrowserUiState.Loading) {
+                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+            } else if (uiState is BrowserUiState.Success) {
+                val syllabuses = (uiState as BrowserUiState.Success).syllabuses
+                if (syllabuses.isEmpty()) {
+                    Text(
+                        "No syllabi have been published by the faculty yet.",
+                        modifier = Modifier.align(Alignment.Center),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else if (selectedSubject == null) {
+                    SubjectList(syllabuses, onSubjectSelect = { selectedSubject = it })
+                } else {
+                    UnitList(selectedSubject!!)
+                }
+            } else if (uiState is BrowserUiState.Error) {
+                Text(
+                    "Error: ${(uiState as BrowserUiState.Error).message}",
+                    modifier = Modifier.align(Alignment.Center).padding(16.dp),
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodyLarge
+                )
             }
         }
     }
 }
 
 @Composable
-fun SubjectList(onSubjectSelect: (SubjectSyllabus) -> Unit) {
+fun SubjectList(syllabuses: List<SubjectSyllabus>, onSubjectSelect: (SubjectSyllabus) -> Unit) {
     LazyColumn(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
             Text(
-                "B.Tech CSE Semester 6",
+                "Course Curriculum",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
         }
-        items(PredefinedSyllabus.bTechCse6thSem) { syllabus ->
+        items(syllabuses) { syllabus ->
             AcadMateCard(
                 variant = CardVariant.Flat,
                 modifier = Modifier.fillMaxWidth(),

@@ -26,11 +26,6 @@ class SecurityRepository @Inject constructor(
             emit(SecurityCheckResult.RootedDevice)
         }
 
-        // 4. Device Binding (Simulated server check)
-        delay(500)
-        val deviceId = proxyDetectionService.getDeviceId()
-        // In real app, send deviceId to server to check binding
-        
         emit(SecurityCheckResult.AllClear)
     }
 }

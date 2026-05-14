@@ -1,17 +1,17 @@
 package com.acadmate.core.model
 
 data class SubjectSyllabus(
-    val subjectCode: String,
-    val subjectName: String,
-    val description: String,
-    val credits: Int,
-    val ltp: String, // e.g., "2:0:2"
-    val units: List<SyllabusUnit>
+    val subjectCode: String = "",
+    val subjectName: String = "",
+    val description: String = "",
+    val credits: Int = 0,
+    val ltp: String = "", // e.g., "2:0:2"
+    val units: List<SyllabusUnit> = emptyList()
 )
 
 data class SyllabusUnit(
-    val title: String,
-    val topics: List<String>
+    val title: String = "",
+    val topics: List<String> = emptyList()
 )
 
 object PredefinedSyllabus {

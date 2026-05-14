@@ -71,10 +71,11 @@ class AcousticTokenReceiver @Inject constructor() {
         }
         
         // Ensure there is some sound (not silence)
-        if (maxAmplitude < 500) return false
+        if (maxAmplitude < 200) return false
 
         // High zero-crossing rate roughly indicates high frequency
+        // For 18.5kHz at 44.1kHz, expected rate is ~0.84
         val rate = zeroCrossings.toFloat() / length
-        return rate > 0.65f // Further lowered to handle budget mics or cases where low-pass filters are aggressive
+        return rate > 0.60f
     }
 }

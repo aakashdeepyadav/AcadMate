@@ -16,12 +16,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.QrCodeScanner
@@ -41,6 +43,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -77,12 +81,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import com.acadmate.designsystem.theme.rememberAcadMateHapticFeedback
-import android.content.BroadcastReceiver
-import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
 import androidx.fragment.app.FragmentActivity
-import com.acadmate.core.security.BiometricAuthenticator
 import javax.inject.Inject
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.acadmate.attendance.geo.AttendanceForegroundService
@@ -92,57 +91,13 @@ fun MarkAttendanceScreen(
     viewModel: AttendanceViewModel,
     subject: String = "Class",
     faculty: String = "Faculty",
-    onNavigateBack: () -> Unit = {}
+    onNavigateBack: () -> Unit = {},
+    onGoToProfile: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var currentStep by remember { mutableIntStateOf(1) }
     val context = LocalContext.current
     val haptic = rememberAcadMateHapticFeedback()
-
-    // Biometric re-auth handling
-    val biometricAuthenticator = remember { BiometricAuthenticator(context) }
-    
-    DisposableEffect(Unit) {
-        val receiver = object : BroadcastReceiver() {
-            override fun onReceive(context: Context?, intent: Intent?) {
-                if (intent?.action == AttendanceForegroundService.ACTION_REAUTH_REQUIRED) {
-                    val subjectName = intent.getStringExtra(AttendanceForegroundService.EXTRA_SUBJECT) ?: subject
-                    val activity = (context as? FragmentActivity) ?: (context?.let { 
-                        var ctx = it
-                        while (ctx is android.content.ContextWrapper) {
-                            if (ctx is FragmentActivity) break
-                            ctx = ctx.baseContext
-                        }
-                        ctx as? FragmentActivity
-                    })
-                    
-                    activity?.let {
-                        biometricAuthenticator.authenticate(
-                            activity = it,
-                            title = "Presence Verification",
-                            subtitle = "Confirm you are still in $subjectName",
-                            onSuccess = {
-                                viewModel.onReauthComplete(it, subjectName)
-                            },
-                            onError = { error ->
-                                // Handle failure - maybe report anomaly
-                            }
-                        )
-                    }
-                }
-            }
-        }
-        val filter = IntentFilter(AttendanceForegroundService.ACTION_REAUTH_REQUIRED)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            context.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
-        } else {
-            context.registerReceiver(receiver, filter)
-        }
-
-        onDispose {
-            context.unregisterReceiver(receiver)
-        }
-    }
 
     val permissionsToRequest = remember {
         val list = mutableListOf(
@@ -252,7 +207,7 @@ fun MarkAttendanceScreen(
                         }
 
                         AttendanceUiState.VerifyingAcoustic -> {
-                            StepAcousticVerification()
+                            StepAcousticVerification(viewModel)
                         }
 
                         AttendanceUiState.VerifyingIdentity -> {
@@ -277,7 +232,11 @@ fun MarkAttendanceScreen(
                             ErrorScreen(
                                 reason = state.reason,
                                 onRetry = {
-                                    viewModel.reset()
+                                    if (state.reason.contains("Profile Photo Required", ignoreCase = true)) {
+                                        onGoToProfile()
+                                    } else {
+                                        viewModel.reset()
+                                    }
                                 }
                             )
                         }
@@ -394,7 +353,9 @@ fun Step1BleScanning() {
 }
 
 @Composable
-fun StepAcousticVerification() {
+fun StepAcousticVerification(viewModel: AttendanceViewModel) {
+    val detectionStatus by viewModel.acousticStatus.collectAsStateWithLifecycle(initialValue = "Listening...")
+    
     Column(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -419,10 +380,42 @@ fun StepAcousticVerification() {
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         
+        Spacer(modifier = Modifier.height(32.dp))
+
+        // Signal Intensity Indicator
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(8.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+        ) {
+            val progress = when {
+                detectionStatus.contains("Analyzing") -> 0.4f
+                detectionStatus.contains("Processing") -> 0.7f
+                detectionStatus.contains("Signal Detected") -> 0.9f
+                else -> 0.2f
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(progress)
+                    .fillMaxHeight()
+                    .background(MaterialTheme.colorScheme.primary)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = detectionStatus,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.Bold
+        )
+        
         Spacer(modifier = Modifier.height(24.dp))
         
         AttendanceStatusBanner(
-            message = "Status: High-frequency token (18.5kHz) detection active",
+            message = "Make sure your microphone is not covered and both devices are close.",
             isError = false
         )
     }
@@ -630,7 +623,7 @@ fun ErrorScreen(reason: String, onRetry: () -> Unit) {
         Spacer(modifier = Modifier.height(LocalSpacing.current.lg))
 
         AcadMateButton(
-            text = "Try Again",
+            text = if (reason.contains("Profile Photo Required", ignoreCase = true)) "Set Up Profile" else "Try Again",
             onClick = onRetry,
             variant = ButtonVariant.Danger,
             modifier = Modifier.fillMaxWidth()

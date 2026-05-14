@@ -58,6 +58,11 @@ screenshots/
 *.swp
 *~
 
+# Presentation Content
+PRESENTATION_CONTENT.md
+AI_PRESENTATION_PROMPT.md
+ULTIMATE_10_SLIDE_DECK.md
+
 # Crashlytics
 com_crashlytics_export_strings.xml
 crashlytics.properties

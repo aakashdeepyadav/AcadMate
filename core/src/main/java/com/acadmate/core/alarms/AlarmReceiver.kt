@@ -7,13 +7,33 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import androidx.core.app.NotificationCompat
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
+
+@AndroidEntryPoint
 class AlarmReceiver : BroadcastReceiver() {
+
+    @Inject
+    lateinit var onboardingDataStore: com.acadmate.core.datastore.OnboardingDataStore
 
     override fun onReceive(context: Context, intent: Intent?) {
         val message = intent?.getStringExtra("EXTRA_MESSAGE") ?: return
         val title = intent.getStringExtra("EXTRA_TITLE") ?: "AcadMate Reminder"
         val id = intent.getStringExtra("EXTRA_ID") ?: return
         val type = intent.getStringExtra("EXTRA_TYPE") ?: "GENERIC"
+
+        val settings = try {
+            runBlocking {
+                val vibe = onboardingDataStore.alarmVibrationEnabled.first()
+                val vol = onboardingDataStore.alarmVolume.first()
+                val tone = onboardingDataStore.alarmTone.first()
+                Triple(vibe, vol, tone)
+            }
+        } catch (e: Exception) {
+            Triple(true, 70, "Default")
+        }
 
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
@@ -26,14 +46,23 @@ class AlarmReceiver : BroadcastReceiver() {
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val name = when(type) {
-                "CLASS" -> "Class Reminders"
+                "CLASS" -> "Class Alarms"
                 "ASSIGNMENT" -> "Assignment Deadlines"
                 "NOTICE" -> "Important Notices"
                 else -> "General Reminders"
             }
             val importance = NotificationManager.IMPORTANCE_HIGH
             val channel = NotificationChannel(channelId, name, importance).apply {
-                enableVibration(true)
+                enableVibration(settings.first)
+                if (type == "CLASS") {
+                    setSound(
+                        android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_ALARM),
+                        android.media.AudioAttributes.Builder()
+                            .setUsage(android.media.AudioAttributes.USAGE_ALARM)
+                            .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                            .build()
+                    )
+                }
             }
             notificationManager.createNotificationChannel(channel)
         }
@@ -43,7 +72,9 @@ class AlarmReceiver : BroadcastReceiver() {
             .setContentTitle(title)
             .setContentText(message)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setCategory(if (type == "CLASS") NotificationCompat.CATEGORY_ALARM else NotificationCompat.CATEGORY_REMINDER)
+            .setSound(android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_ALARM))
+            .setVibrate(if (settings.first) longArrayOf(0, 500, 200, 500) else null)
             .setAutoCancel(true)
             .build()
 

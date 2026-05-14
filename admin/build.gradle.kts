@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.hilt)
     alias(libs.plugins.kotlin.ksp)
+    kotlin("plugin.serialization")
 }
 
 android {
@@ -41,8 +42,11 @@ dependencies {
 
     implementation(project(":core"))
     implementation(project(":designsystem"))
+    implementation(project(":ai"))
 
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.firestore)
     implementation(libs.kotlinx.coroutines.play.services)
+    implementation(libs.kotlinx.serialization.json)
+    implementation(libs.google.generativeai)
 }

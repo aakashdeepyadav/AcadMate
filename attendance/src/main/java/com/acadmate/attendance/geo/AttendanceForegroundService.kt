@@ -23,18 +23,14 @@ class AttendanceForegroundService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var pingJob: Job? = null
     private var wakeLock: PowerManager.WakeLock? = null
-    private var lastReauthTime = System.currentTimeMillis()
 
     companion object {
         const val CHANNEL_ID = "attendance_service_channel"
         const val NOTIFICATION_ID = 1001
-        const val REAUTH_NOTIFICATION_ID = 1002
         const val ACTION_START = "ACTION_START"
         const val ACTION_STOP = "ACTION_STOP"
         const val ACTION_REAUTH_COMPLETE = "ACTION_REAUTH_COMPLETE"
         const val EXTRA_SUBJECT = "EXTRA_SUBJECT"
-        const val REAUTH_INTERVAL = 30 * 60 * 1000L // 30 minutes
-        const val ACTION_REAUTH_REQUIRED = "com.acadmate.attendance.ACTION_REAUTH_REQUIRED"
     }
 
     override fun onCreate() {
@@ -57,9 +53,10 @@ class AttendanceForegroundService : Service() {
                 stopSelf()
             }
             ACTION_REAUTH_COMPLETE -> {
-                lastReauthTime = System.currentTimeMillis()
                 val subject = intent.getStringExtra(EXTRA_SUBJECT) ?: "Class"
-                updateNotification(subject, "Re-authentication successful")
+                val userId = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: "unknown"
+                clearAnomaly(userId, subject)
+                updateNotification(subject, "Status: Re-verified")
             }
         }
         return START_STICKY
@@ -104,11 +101,7 @@ class AttendanceForegroundService : Service() {
                         is GeofenceResult.Error -> "Status: Location unavailable"
                     }
                     
-                    if (System.currentTimeMillis() - lastReauthTime > REAUTH_INTERVAL) {
-                        requestBiometricReauth(subject)
-                    } else {
-                        updateNotification(subject, statusText)
-                    }
+                    updateNotification(subject, statusText)
 
                     if (result is GeofenceResult.OutsideCampus) {
                         reportAnomaly(userId, subject, "Left campus during class: ${result.distance}m away")
@@ -122,25 +115,6 @@ class AttendanceForegroundService : Service() {
         }
     }
 
-    private fun requestBiometricReauth(subject: String) {
-        val intent = Intent(ACTION_REAUTH_REQUIRED).apply {
-            putExtra(EXTRA_SUBJECT, subject)
-            setPackage(packageName)
-        }
-        sendBroadcast(intent)
-
-        val notificationManager = getSystemService(NotificationManager::class.java)
-        val reauthNotification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Re-authentication Required")
-            .setContentText("Please verify your presence for $subject")
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setCategory(NotificationCompat.CATEGORY_ALARM)
-            .setAutoCancel(true)
-            .build()
-        
-        notificationManager.notify(REAUTH_NOTIFICATION_ID, reauthNotification)
-    }
 
     private fun reportAnomaly(userId: String, subject: String, reason: String) {
         val firestore = com.google.firebase.firestore.FirebaseFirestore.getInstance()
@@ -159,6 +133,19 @@ class AttendanceForegroundService : Service() {
                     .collection("anomalies")
                     .document(userId)
                     .set(anomalyData)
+            } catch (e: Exception) { }
+        }
+    }
+
+    private fun clearAnomaly(userId: String, subject: String) {
+        val firestore = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+        serviceScope.launch {
+            try {
+                firestore.collection("active_sessions")
+                    .document(subject)
+                    .collection("anomalies")
+                    .document(userId)
+                    .delete()
             } catch (e: Exception) { }
         }
     }

@@ -128,7 +128,6 @@ fun StudentHomeScreen(
                         QuickActionItem("Results", Icons.Default.Assessment, AccentEmerald),
                         QuickActionItem("Assignments", Icons.Default.Assignment, AccentPink),
                         QuickActionItem("Materials", Icons.Default.Folder, Color(0xFF6C5CE7)),
-                        QuickActionItem("Leave", Icons.Default.EventBusy, WarningAmber),
                         QuickActionItem("Notice Board", Icons.Default.Campaign, AccentCyan)
                     ),
                     onActionClick = onActionClick
@@ -142,8 +141,7 @@ fun StudentHomeScreen(
                     actions = listOf(
                         QuickActionItem("AI Tutor", Icons.Default.AutoAwesome, AccentPurple),
                         QuickActionItem("Syllabus", Icons.AutoMirrored.Filled.MenuBook, Color(0xFFF59E0B)),
-                        QuickActionItem("Lecture", Icons.Default.GraphicEq, AccentPink),
-                        QuickActionItem("Focus", Icons.Default.Timer, AccentEmerald)
+                        QuickActionItem("Lecture", Icons.Default.GraphicEq, AccentPink)
                     ),
                     onActionClick = onActionClick
                 )
@@ -545,22 +543,22 @@ fun FeaturedToolsRow(uiState: HomeUiState, onActionClick: (String) -> Unit) {
         ) {
             item {
                 VerticalFeaturedCard(
-                    title = "Syllabus Analysis",
-                    subtitle = "Find hidden gaps",
+                    title = "Course Syllabus",
+                    subtitle = "View your curriculum",
                     color = Color(0xFFEEF2FF),
-                    icon = Icons.Default.AutoAwesome,
+                    icon = Icons.Default.MenuBook,
                     iconTint = SoftBlue,
                     onClick = { onActionClick("Syllabus") }
                 )
             }
             item {
                 VerticalFeaturedCard(
-                    title = "Deep Focus",
-                    subtitle = "Boost productivity",
+                    title = "Lecture Summarizer",
+                    subtitle = "Audio to Notes",
                     color = Color(0xFFFDF2F8),
-                    icon = Icons.Default.Timer,
+                    icon = Icons.Default.GraphicEq,
                     iconTint = AccentPink,
-                    onClick = { onActionClick("Focus") }
+                    onClick = { onActionClick("Lecture") }
                 )
             }
             item {

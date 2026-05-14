@@ -27,6 +27,11 @@ fun ManageNotificationsScreen(
     val assignmentReminders by viewModel.assignmentRemindersEnabled.collectAsStateWithLifecycle(initialValue = true)
     val examNotifications by viewModel.examNotificationsEnabled.collectAsStateWithLifecycle(initialValue = true)
     val smartInsights by viewModel.smartInsightsEnabled.collectAsStateWithLifecycle(initialValue = false)
+    
+    val autoAlarms by viewModel.autoAlarmsEnabled.collectAsStateWithLifecycle(initialValue = false)
+    val alarmVibration by viewModel.alarmVibrationEnabled.collectAsStateWithLifecycle(initialValue = true)
+    val alarmVolume by viewModel.alarmVolume.collectAsStateWithLifecycle(initialValue = 70)
+    val alarmTone by viewModel.alarmTone.collectAsStateWithLifecycle(initialValue = "Default")
 
     Scaffold(
         topBar = {
@@ -93,6 +98,67 @@ fun ManageNotificationsScreen(
                         checked = smartInsights,
                         onCheckedChange = { viewModel.setSmartInsightsEnabled(it) }
                     )
+                }
+            }
+
+            Text(
+                text = "Class Auto Alarm",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold
+            )
+
+            AcadMateCard(variant = CardVariant.Flat) {
+                Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                    NotificationToggleRow(
+                        title = "Smart Auto-Alarm",
+                        subtitle = "Ring 1 hour before your FIRST class",
+                        checked = autoAlarms,
+                        onCheckedChange = { viewModel.setAutoAlarmsEnabled(it) }
+                    )
+                    
+                    if (autoAlarms) {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(vertical = 8.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.1f)
+                        )
+                        
+                        Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                            Text("Alarm Volume", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("${alarmVolume}%", style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(32.dp))
+                                Slider(
+                                    value = alarmVolume.toFloat(),
+                                    onValueChange = { viewModel.setAlarmVolume(it.toInt()) },
+                                    valueRange = 0f..100f,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+
+                        NotificationToggleRow(
+                            title = "Vibration",
+                            subtitle = "Vibrate during alarm",
+                            checked = alarmVibration,
+                            onCheckedChange = { viewModel.setAlarmVibrationEnabled(it) }
+                        )
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(text = "Alarm Tone", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                                Text(text = alarmTone, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                            }
+                            TextButton(onClick = { /* In a real app, open ringtone picker */ }) {
+                                Text("Change")
+                            }
+                        }
+                    }
                 }
             }
             

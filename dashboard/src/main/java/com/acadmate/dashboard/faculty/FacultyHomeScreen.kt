@@ -69,12 +69,20 @@ fun FacultyHomeScreen(
                 verticalArrangement = Arrangement.spacedBy(LocalSpacing.current.md)
             ) {
                 item {
-                    FacultyHeader(uiState.name, onProfileClick, onRefresh = { viewModel.refresh() })
+                    FacultyHeader(
+                        name = uiState.name, 
+                        sessionCount = uiState.upcomingClasses.size,
+                        onProfileClick = onProfileClick, 
+                        onRefresh = { viewModel.refresh() }
+                    )
                 }
 
                 // Analytics Overview
                 item {
-                    FacultyAnalyticsRow()
+                    FacultyAnalyticsRow(
+                        avgAttendance = uiState.averageAttendance,
+                        assignmentCount = uiState.assignmentCount
+                    )
                 }
 
                 // Live Class Status - High Priority
@@ -165,14 +173,14 @@ fun AttendanceTrendCard(trends: List<Float>) {
 }
 
 @Composable
-fun FacultyAnalyticsRow() {
+fun FacultyAnalyticsRow(avgAttendance: String, assignmentCount: String) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(LocalSpacing.current.md)
     ) {
         StatMiniCard(
             label = "Avg Attendance",
-            value = "84%",
+            value = avgAttendance,
             icon = Icons.AutoMirrored.Filled.TrendingUp,
             color = Color(0xFFE0F2FE),
             tint = Color(0xFF0284C7),
@@ -180,7 +188,7 @@ fun FacultyAnalyticsRow() {
         )
         StatMiniCard(
             label = "Assignments",
-            value = "12",
+            value = assignmentCount,
             icon = Icons.Default.PendingActions,
             color = Color(0xFFFEF2F2),
             tint = Color(0xFFDC2626),
@@ -222,7 +230,9 @@ fun QuickActionGrid(
         FacultyAction("Assignments", Icons.AutoMirrored.Filled.Assignment, Color(0xFFF59E0B), "Post Assignment"),
         FacultyAction("Materials", Icons.AutoMirrored.Filled.LibraryBooks, Color(0xFF10B981), "Materials"),
         FacultyAction("Leave Mgmt", Icons.AutoMirrored.Filled.EventNote, Color(0xFFEC4899), "Leave Management"),
-        FacultyAction("Announce", Icons.Default.Campaign, Color(0xFF6C5CE7), "Notice Board")
+        FacultyAction("Timetable", Icons.Default.CalendarMonth, Color(0xFFE17055), "Timetable"),
+        FacultyAction("Announce", Icons.Default.Campaign, Color(0xFF6C5CE7), "Notice Board"),
+        FacultyAction("Syllabus", Icons.Default.MenuBook, Color(0xFF0EA5E9), "Manage Syllabus")
     )
 
     Column(verticalArrangement = Arrangement.spacedBy(LocalSpacing.current.sm)) {
@@ -485,7 +495,7 @@ fun LiveClassControlCard(
 }
 
 @Composable
-fun FacultyHeader(name: String, onProfileClick: () -> Unit, onRefresh: () -> Unit) {
+fun FacultyHeader(name: String, sessionCount: Int, onProfileClick: () -> Unit, onRefresh: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth().statusBarsPadding(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -498,8 +508,13 @@ fun FacultyHeader(name: String, onProfileClick: () -> Unit, onRefresh: () -> Uni
                 fontWeight = FontWeight.Black,
                 letterSpacing = (-0.5).sp
             )
+            val sessionText = when {
+                sessionCount == 0 -> "Your schedule is clear for today"
+                sessionCount == 1 -> "You have 1 class session today"
+                else -> "Ready for your $sessionCount scheduled classes?"
+            }
             Text(
-                "You have ${3} sessions today", 
+                sessionText,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

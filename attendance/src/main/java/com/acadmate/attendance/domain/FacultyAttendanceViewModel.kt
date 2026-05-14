@@ -39,7 +39,8 @@ data class FacultyAttendanceUiState(
 
 @HiltViewModel
 class FacultyAttendanceViewModel @Inject constructor(
-    private val acousticGenerator: AcousticTokenGenerator
+    private val acousticGenerator: AcousticTokenGenerator,
+    private val timetableRepository: com.acadmate.core.db.TimetableRepository
 ) : ViewModel() {
 
     private val firestore = FirebaseFirestore.getInstance()
@@ -48,11 +49,44 @@ class FacultyAttendanceViewModel @Inject constructor(
 
     fun startAttendanceSession(classId: String) {
         viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true)
+            
+            // 1. Verify if class is actually scheduled for this faculty today
+            val calendar = java.util.Calendar.getInstance()
+            val dayOfWeek = when(calendar.get(java.util.Calendar.DAY_OF_WEEK)) {
+                java.util.Calendar.MONDAY -> 1
+                java.util.Calendar.TUESDAY -> 2
+                java.util.Calendar.WEDNESDAY -> 3
+                java.util.Calendar.THURSDAY -> 4
+                java.util.Calendar.FRIDAY -> 5
+                java.util.Calendar.SATURDAY -> 6
+                java.util.Calendar.SUNDAY -> 7
+                else -> 1
+            }
+
+            val todaySchedule = timetableRepository.getTimetableForDaySync(dayOfWeek)
+            val currentFacultyName = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.displayName ?: ""
+            
+            val isScheduled = todaySchedule.any { 
+                (it.id == classId || it.subject == classId) && 
+                it.faculty.contains(currentFacultyName, ignoreCase = true) 
+            }
+
+            if (!isScheduled && currentFacultyName.isNotBlank()) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    error = "Access Denied: You do not have a scheduled class for '$classId' today."
+                )
+                return@launch
+            }
+
             val startTime = System.currentTimeMillis()
             _uiState.value = _uiState.value.copy(
+                isLoading = false,
                 isSessionActive = true,
                 sessionStartTime = startTime,
-                className = classId
+                className = classId,
+                error = null
             )
             
             // Save active session to Firestore
@@ -131,7 +165,7 @@ class FacultyAttendanceViewModel @Inject constructor(
                     .addSnapshotListener { snapshot, e ->
                         if (e != null) return@addSnapshotListener
                         
-                        val markedStudentIds = snapshot?.documents?.map { it.getString("studentId") } ?: emptyList()
+                                val markedStudentIds = snapshot?.documents?.map { it.getString("studentId") ?: "" } ?: emptyList()
 
                         // Also fetch anomalies for this session
                         firestore.collection("active_sessions")
@@ -143,14 +177,15 @@ class FacultyAttendanceViewModel @Inject constructor(
                                 } ?: emptyMap()
 
                                 val attendanceRecords = students.map { student ->
+                                    val currentRegNo = student.regNo ?: student.id
                                     StudentAttendanceRecord(
-                                        studentId = student.id,
+                                        studentId = currentRegNo,
                                         studentName = student.name,
-                                        enrollmentNumber = student.regNo ?: "N/A",
+                                        enrollmentNumber = currentRegNo,
                                         profilePictureUrl = student.profilePictureUrl,
-                                        isPresent = markedStudentIds.contains(student.id),
-                                        hasAnomaly = anomalyMap.containsKey(student.id),
-                                        anomalyReason = anomalyMap[student.id]
+                                        isPresent = markedStudentIds.contains(currentRegNo),
+                                        hasAnomaly = anomalyMap.containsKey(currentRegNo),
+                                        anomalyReason = anomalyMap[currentRegNo]
                                     )
                                 }
 

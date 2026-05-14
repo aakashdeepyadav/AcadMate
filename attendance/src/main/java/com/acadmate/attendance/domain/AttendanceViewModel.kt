@@ -32,8 +32,10 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 import java.time.ZoneOffset
+import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 import com.acadmate.core.util.DeviceIdManager
+import com.acadmate.core.db.UserRepository
 
 @HiltViewModel
 class AttendanceViewModel @Inject constructor(
@@ -42,7 +44,8 @@ class AttendanceViewModel @Inject constructor(
     private val geofenceValidator: GeofenceValidator,
     private val onboardingDataStore: OnboardingDataStore,
     private val acousticTokenReceiver: AcousticTokenReceiver,
-    private val deviceIdManager: DeviceIdManager
+    private val deviceIdManager: DeviceIdManager,
+    private val userRepository: UserRepository
 ) : ViewModel() {
 
     private val _userRole = MutableStateFlow<UserRole?>(null)
@@ -50,25 +53,16 @@ class AttendanceViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            try {
-                // Priority 1: Check Database/Firestore
-                val userId = auth.currentUser?.uid
-                if (userId != null) {
-                    val doc = firestore.collection("users").document(userId).get().await()
-                    if (doc.exists()) {
-                        val roleStr = doc.getString("role")
-                        if (roleStr != null) {
-                            val role = UserRole.fromString(roleStr)
-                            _userRole.value = role
-                            return@launch
-                        }
-                    }
+            // Priority 1: Check UserRepository (local db synced with remote)
+            userRepository.getCurrentUser().collect { user ->
+                if (user != null) {
+                    _userRole.value = user.role
                 }
-            } catch (e: Exception) {
-                // Fallback to local on error
             }
-            
-            // Priority 2: Fallback to onboarding choice
+        }
+
+        // Priority 2: Fallback to onboarding choice if local is empty
+        viewModelScope.launch {
             onboardingDataStore.selectedRole.collect { role ->
                 if (_userRole.value == null) {
                     _userRole.value = role
@@ -82,6 +76,9 @@ class AttendanceViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow<AttendanceUiState>(AttendanceUiState.Idle)
     val uiState: StateFlow<AttendanceUiState> = _uiState
+
+    private val _acousticStatus = MutableStateFlow("Listening...")
+    val acousticStatus: StateFlow<String> = _acousticStatus.asStateFlow()
 
     private val _attendanceHistory = MutableStateFlow<List<AttendanceSession>>(emptyList())
     val attendanceHistory: StateFlow<List<AttendanceSession>> = _attendanceHistory
@@ -120,7 +117,15 @@ class AttendanceViewModel @Inject constructor(
                         "updatedAt" to System.currentTimeMillis()
                     )
                     firestore.collection("users").document(userId).set(basicUser, com.google.firebase.firestore.SetOptions.merge()).await()
+                    _uiState.value = AttendanceUiState.Failed("Profile Incomplete: Please set up your profile photo for Face ID verification.")
+                    return@launch
                 } else {
+                    val profilePhoto = userDoc.getString("profilePictureUrl")
+                    if (profilePhoto.isNullOrBlank()) {
+                        _uiState.value = AttendanceUiState.Failed("Profile Photo Required: Please upload your photo in profile settings for Face ID matching.")
+                        return@launch
+                    }
+
                     val boundDeviceId = userDoc.getString("boundDeviceId")
                     
                     if (boundDeviceId != null && boundDeviceId != currentDeviceId) {
@@ -147,12 +152,18 @@ class AttendanceViewModel @Inject constructor(
 
                 // Step 2: Acoustic Verification (Layer 2 - Immediate)
                 _uiState.value = AttendanceUiState.VerifyingAcoustic
-                val tokenDetected = acousticTokenReceiver.listenForToken(timeoutMs = 10000)
+                _acousticStatus.value = "Analyzing ambient signal..."
+                delay(1000)
+                _acousticStatus.value = "Processing secure token..."
+                
+                val tokenDetected = acousticTokenReceiver.listenForToken(timeoutMs = 15000)
                 
                 if (!tokenDetected) {
-                    _uiState.value = AttendanceUiState.Failed("Not in Classroom: Acoustic signal not found")
+                    _acousticStatus.value = "Verification failed"
+                    _uiState.value = AttendanceUiState.Failed("Not in Classroom: Acoustic signal not found. Make sure both devices are close and microphone is not covered.")
                     return@launch
                 }
+                _acousticStatus.value = "Acoustic Signal Detected!"
                 acousticVerified = true
 
                 // Step 3: Identity & Geo (Layer 3)
@@ -185,7 +196,12 @@ class AttendanceViewModel @Inject constructor(
         _uiState.value = AttendanceUiState.VerifyingLocation
         val geoResult = validateGeofence()
         if (geoResult !is GeofenceResult.InsideCampus) {
-            _uiState.value = AttendanceUiState.Failed("Off campus")
+            val message = when(geoResult) {
+                is GeofenceResult.OutsideCampus -> "Off campus: ${String.format("%.0f", geoResult.distance)}m away"
+                is GeofenceResult.Error -> "Location error: ${geoResult.message}"
+                else -> "Off campus"
+            }
+            _uiState.value = AttendanceUiState.Failed(message)
             return
         }
         geoVerified = true
@@ -265,29 +281,31 @@ class AttendanceViewModel @Inject constructor(
 
     private fun saveAttendanceRecord(subject: String, faculty: String) {
         val now = LocalDateTime.now()
-        val userId = auth.currentUser?.uid ?: return
         
-        // Extract hour for specific hourly tracking (Each hour is a separate session)
-        val currentHour = now.hour
-        val hourlySessionId = "${subject.replace(":", "_").replace(" ", "_")}_${now.year}${now.monthValue}${now.dayOfMonth}_$currentHour"
-
-        val displayFaculty = if (faculty.isBlank() || faculty == "Faculty") "Not Assigned" else faculty
-
-        val record = AttendanceRecord(
-            id = hourlySessionId,
-            subject = subject,
-            date = now,
-            markedAt = now,
-            faculty = displayFaculty,
-            status = AttendanceStatus.PRESENT
-        )
-
         viewModelScope.launch {
             try {
+                val user = userRepository.getCurrentUser().first()
+                val regNo = user?.regNo ?: return@launch
+                
+                // Extract hour for specific hourly tracking (Each hour is a separate session)
+                val currentHour = now.hour
+                val hourlySessionId = "${subject.replace(":", "_").replace(" ", "_")}_${now.year}${now.monthValue}${now.dayOfMonth}_$currentHour"
+
+                val displayFaculty = if (faculty.isBlank() || faculty == "Faculty") "Not Assigned" else faculty
+
+                val record = AttendanceRecord(
+                    id = hourlySessionId,
+                    subject = subject,
+                    date = now,
+                    markedAt = now,
+                    faculty = displayFaculty,
+                    status = AttendanceStatus.PRESENT
+                )
+
                 // Save to Firestore with hourly session granularity
                 val firestoreRecord = hashMapOf(
                     "sessionId" to hourlySessionId,
-                    "studentId" to userId,
+                    "studentId" to regNo,
                     "subject" to subject,
                     "faculty" to displayFaculty,
                     "hour" to currentHour,
@@ -296,7 +314,7 @@ class AttendanceViewModel @Inject constructor(
                     "status" to AttendanceStatus.PRESENT.name
                 )
                 
-                firestore.collection("attendance").document("${userId}_$hourlySessionId")
+                firestore.collection("attendance").document("${regNo}_$hourlySessionId")
                     .set(firestoreRecord)
                     .await()
 

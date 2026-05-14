@@ -59,6 +59,7 @@ fun LoginScreen(
 
     // Handle verification success state internally to show animation
     var showSuccess by remember { mutableStateOf(false) }
+    var showForgotPasswordDialog by remember { mutableStateOf(false) }
 
     // Handle state changes
     LaunchedEffect(uiState) {
@@ -83,6 +84,11 @@ fun LoginScreen(
                 if (lastPhoneInputState == null) {
                     viewModel.resetState()
                 }
+            }
+            is AuthUiState.PasswordResetSent -> {
+                snackbarHostState.showSnackbar((uiState as AuthUiState.PasswordResetSent).message)
+                showForgotPasswordDialog = false
+                viewModel.resetState()
             }
             else -> {}
         }
@@ -261,10 +267,10 @@ fun LoginScreen(
                             Spacer(modifier = Modifier.height(LocalSpacing.current.md))
 
                             Text(
-                                text = "Forgot Password? Contact Institution Admin",
+                                text = "Forgot Password? Reset Here",
                                 style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
                                 color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.clickable { /* Logic */ }
+                                modifier = Modifier.clickable { showForgotPasswordDialog = true }
                             )
                         }
                     }
@@ -273,6 +279,39 @@ fun LoginScreen(
                 }
             }
         }
+    }
+
+    if (showForgotPasswordDialog) {
+        var resetRegNo by remember { mutableStateOf(regNo) }
+        AlertDialog(
+            onDismissRequest = { showForgotPasswordDialog = false },
+            title = { Text("Reset Password") },
+            text = {
+                Column {
+                    Text("Enter your Registration Number. We will send a password reset link to your registered email address.")
+                    Spacer(modifier = Modifier.height(16.dp))
+                    AcadMateTextField(
+                        value = resetRegNo,
+                        onValueChange = { resetRegNo = it },
+                        label = "Registration Number",
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { viewModel.resetPassword(resetRegNo) },
+                    enabled = resetRegNo.isNotBlank() && uiState !is AuthUiState.Loading
+                ) {
+                    Text("Send Reset Link")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showForgotPasswordDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }
 

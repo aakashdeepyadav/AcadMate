@@ -13,12 +13,15 @@ import androidx.hilt.work.HiltWorker
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 
+import kotlinx.coroutines.flow.first
+
 @HiltWorker
 class AutoAlarmWorker @AssistedInject constructor(
     @Assisted appContext: Context,
     @Assisted workerParams: WorkerParameters,
     private val repository: TimetableRepository,
-    private val alarmScheduler: AndroidAlarmScheduler
+    private val alarmScheduler: AndroidAlarmScheduler,
+    private val onboardingDataStore: com.acadmate.core.datastore.OnboardingDataStore
 ) : CoroutineWorker(appContext, workerParams) {
 
     override suspend fun doWork(): Result {
@@ -29,6 +32,9 @@ class AutoAlarmWorker @AssistedInject constructor(
             // Skip if not logged in
             val currentUserId = auth.currentUser?.uid ?: return Result.success()
             android.util.Log.d("AutoAlarmWorker", "Starting alarm scheduling for user: $currentUserId")
+
+            val autoAlarmsEnabled = onboardingDataStore.autoAlarmsEnabled.first()
+            if (!autoAlarmsEnabled) return Result.success()
 
             val now = LocalDateTime.now()
 
@@ -66,8 +72,17 @@ class AutoAlarmWorker @AssistedInject constructor(
                 }
                 
                 val dayClasses = repository.getTimetableForDaySync(dayIndex)
-                dayClasses.filter { it.isAlarmSet }.forEach { classInfo ->
+                
+                // User wants 1 hour before alarm specifically for the FIRST class of the day
+                val firstClass = dayClasses.minByOrNull { it.startTime }
+                
+                dayClasses.forEach { classInfo ->
                     try {
+                        val isFirstClass = classInfo.id == firstClass?.id
+                        val shouldSchedule = classInfo.isAlarmSet || isFirstClass
+
+                        if (!shouldSchedule) return@forEach
+
                         val startTimeParts = classInfo.startTime.split(":")
                         if (startTimeParts.size == 2) {
                             val hour = startTimeParts[0].toInt()
@@ -83,19 +98,19 @@ class AutoAlarmWorker @AssistedInject constructor(
                             
                             val dateTag = "${targetCalendar.get(java.util.Calendar.DAY_OF_YEAR)}"
                             
-                            // 1 Hour Before Alarm
+                            // 1 Hour Before Alarm (Mandatory for first class if auto-alarm is on)
                             val alarmTimeOneHour = classDateTime.minusHours(1)
                             if (alarmTimeOneHour.isAfter(now)) {
                                 alarmScheduler.schedule(AlarmItem(
                                     id = "CLASS_1H_${classInfo.id}_$dateTag",
                                     time = alarmTimeOneHour,
-                                    title = "Class in 1 Hour: ${classInfo.subject}",
+                                    title = if (isFirstClass) "First Class in 1 Hour" else "Class in 1 Hour: ${classInfo.subject}",
                                     message = "Your session starts at ${classInfo.startTime} in ${classInfo.room}",
                                     type = "CLASS"
                                 ))
                             }
 
-                            // 10 Min Before Quick Reminder
+                            // 10 Min Before Quick Reminder (Only if explicitly set or it's the first class)
                             val alarmTimeQuick = classDateTime.minusMinutes(10)
                             if (alarmTimeQuick.isAfter(now)) {
                                 alarmScheduler.schedule(AlarmItem(

@@ -1,6 +1,7 @@
 package com.acadmate.admin.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -106,7 +107,9 @@ class AdminCourseViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 val snapshot = firestore.collection("courses").get().await()
-                val courseList = snapshot.toObjects(Course::class.java)
+                val courseList = snapshot.documents.mapNotNull { doc ->
+                    doc.toObject(Course::class.java)?.copy(id = doc.id)
+                }
                 _courses.clear()
                 _courses.addAll(courseList)
             } catch (e: Exception) {
@@ -171,6 +174,7 @@ fun CourseManagementScreen(
         CourseDialog(
             course = editingCourse,
             subjects = viewModel.subjects,
+            existingCourses = viewModel.courses,
             facultyList = viewModel.facultyList,
             onDismiss = { 
                 showCourseDialog = false
@@ -302,7 +306,10 @@ fun CourseManagementScreen(
                         viewModel.courses.filter { it.name == selectedFilter?.name }
                     }
 
-                    items(filteredCourses) { course ->
+                    items(
+                        items = filteredCourses,
+                        key = { it.id }
+                    ) { course ->
                         CourseItemCard(
                             course = course, 
                             onEditClick = { 
@@ -323,12 +330,25 @@ fun CourseManagementScreen(
 fun CourseDialog(
     course: Course? = null,
     subjects: List<Subject>,
+    existingCourses: List<Course>,
     facultyList: List<String>,
     onDismiss: () -> Unit,
     onAddSubjectClick: () -> Unit,
     onSave: (String, String, String, Int, String?) -> Unit
 ) {
-    var selectedSubject by remember { mutableStateOf(subjects.find { it.name == course?.name }) }
+    var selectedSubject by remember { 
+        mutableStateOf(subjects.find { it.name == course?.name && it.code == course?.code }) 
+    }
+    
+    // Filter out subjects that are already assigned to a course, 
+    // but keep the current subject if we're editing.
+    val availableSubjects = remember(subjects, existingCourses, course) {
+        val assignedSubjectCodes = existingCourses.map { it.code }.toSet()
+        subjects.filter { subject ->
+            subject.code !in assignedSubjectCodes || subject.code == course?.code
+        }
+    }
+    
     var credits by remember { mutableStateOf(course?.credits?.toString() ?: "4") }
     var selectedFaculty by remember { mutableStateOf<String?>(course?.assignedFaculty) }
     
@@ -368,7 +388,7 @@ fun CourseDialog(
                             expanded = subjectExpanded,
                             onDismissRequest = { subjectExpanded = false }
                         ) {
-                            subjects.forEach { subject ->
+                            availableSubjects.forEach { subject ->
                                 DropdownMenuItem(
                                     text = { Text("${subject.name} (${subject.code})") },
                                     onClick = {
@@ -563,8 +583,8 @@ fun CourseItemCard(
 ) {
     AcadMateCard(
         modifier = Modifier.fillMaxWidth(),
-        variant = CardVariant.Flat,
-        cornerRadius = 12.dp,
+        variant = CardVariant.Elevated,
+        cornerRadius = 16.dp,
         contentPadding = 16.dp
     ) {
         Row(
@@ -574,16 +594,17 @@ fun CourseItemCard(
             // Department Icon Box
             Box(
                 modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+                    .size(52.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f))
+                    .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.12f), RoundedCornerShape(14.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    Icons.Default.School,
+                    Icons.Default.AutoStories,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(26.dp)
                 )
             }
             
@@ -592,70 +613,95 @@ fun CourseItemCard(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = course.name,
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = (-0.5).sp
+                    ),
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = "${course.code} • ${course.credits} Credits",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
                     Surface(
-                        color = MaterialTheme.colorScheme.secondaryContainer,
-                        shape = RoundedCornerShape(4.dp)
+                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f),
+                        shape = RoundedCornerShape(6.dp)
                     ) {
                         Text(
-                            text = course.department,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                            text = course.code,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                             color = MaterialTheme.colorScheme.onSecondaryContainer
                         )
                     }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "• ${course.credits} Credits",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
                 
                 Spacer(modifier = Modifier.height(8.dp))
                 
                 if (course.assignedFaculty != null) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            Icons.Default.AccountCircle, 
+                            contentDescription = null, 
+                            modifier = Modifier.size(16.dp), 
+                            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = course.assignedFaculty,
-                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
                             color = MaterialTheme.colorScheme.primary
                         )
                     }
                 } else {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Warning, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.error)
-                        Spacer(modifier = Modifier.width(4.dp))
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f))
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.Warning, 
+                            contentDescription = null, 
+                            modifier = Modifier.size(14.dp), 
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "Unassigned",
-                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                            text = "Faculty Unassigned",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                             color = MaterialTheme.colorScheme.error
                         )
                     }
                 }
             }
             
-            Row {
-                IconButton(onClick = onEditClick) {
+            Column(horizontalAlignment = Alignment.End) {
+                IconButton(
+                    onClick = onEditClick,
+                    modifier = Modifier.size(36.dp)
+                ) {
                     Icon(
-                        Icons.Default.Settings,
+                        Icons.Default.Edit,
                         contentDescription = "Edit Course",
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(18.dp)
                     )
                 }
-                IconButton(onClick = onDeleteClick) {
+                IconButton(
+                    onClick = onDeleteClick,
+                    modifier = Modifier.size(36.dp)
+                ) {
                     Icon(
-                        Icons.Default.Delete,
+                        Icons.Default.DeleteOutline,
                         contentDescription = "Delete Course",
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(20.dp)
+                        tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
+                        modifier = Modifier.size(18.dp)
                     )
                 }
             }

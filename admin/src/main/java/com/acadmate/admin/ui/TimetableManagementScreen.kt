@@ -39,8 +39,8 @@ class AdminTimetableViewModel : ViewModel() {
     private val _timetable = mutableStateListOf<TimetableEntity>()
     val timetable: List<TimetableEntity> get() = _timetable
 
-    private val _subjects = mutableStateListOf<Subject>()
-    val subjects: List<Subject> get() = _subjects
+    private val _courses = mutableStateListOf<Course>()
+    val courses: List<Course> get() = _courses
 
     private val _facultyList = mutableStateListOf<String>()
     val facultyList: List<String> get() = _facultyList
@@ -52,7 +52,7 @@ class AdminTimetableViewModel : ViewModel() {
     val selectedDay: State<Int> = _selectedDay
 
     init {
-        loadSubjects()
+        loadCourses()
         loadFaculty()
         loadTimetable(1)
     }
@@ -62,12 +62,15 @@ class AdminTimetableViewModel : ViewModel() {
         loadTimetable(day)
     }
 
-    private fun loadSubjects() {
+    private fun loadCourses() {
         viewModelScope.launch {
             try {
-                val snapshot = firestore.collection("subjects").get().await()
-                _subjects.clear()
-                _subjects.addAll(snapshot.toObjects(Subject::class.java))
+                val snapshot = firestore.collection("courses").get().await()
+                val courseList = snapshot.documents.mapNotNull { doc ->
+                    doc.toObject(Course::class.java)?.copy(id = doc.id)
+                }
+                _courses.clear()
+                _courses.addAll(courseList)
             } catch (e: Exception) {}
         }
     }
@@ -148,6 +151,36 @@ class AdminTimetableViewModel : ViewModel() {
         }
     }
 
+    fun updateTimetableItem(id: String, subject: String, faculty: String, start: String, end: String, room: String) {
+        viewModelScope.launch {
+            try {
+                val map = hashMapOf(
+                    "subject" to subject,
+                    "faculty" to faculty,
+                    "startTime" to start,
+                    "endTime" to end,
+                    "room" to room
+                )
+                
+                firestore.collection("global_timetable").document(id).update(map as Map<String, Any>).await()
+                
+                // Update local list
+                val index = _timetable.indexOfFirst { it.id == id }
+                if (index >= 0) {
+                    val updated = _timetable[index].copy(
+                        subject = subject,
+                        faculty = faculty,
+                        startTime = start,
+                        endTime = end,
+                        room = room
+                    )
+                    _timetable[index] = updated
+                    _timetable.sortBy { it.startTime }
+                }
+            } catch (e: Exception) {}
+        }
+    }
+
     fun deleteTimetableItem(id: String) {
         viewModelScope.launch {
             try {
@@ -165,16 +198,26 @@ fun TimetableManagementScreen(
     onBackClick: () -> Unit
 ) {
     var showAddDialog by remember { mutableStateOf(false) }
+    var editingItem by remember { mutableStateOf<TimetableEntity?>(null) }
     val days = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
 
-    if (showAddDialog) {
+    if (showAddDialog || editingItem != null) {
         TimetableDialog(
-            subjects = viewModel.subjects,
+            courses = viewModel.courses,
             facultyList = viewModel.facultyList,
-            onDismiss = { showAddDialog = false },
-            onSave = { subject, faculty, start, end, room ->
-                viewModel.addTimetableItem(subject, faculty, start, end, room)
+            initialItem = editingItem,
+            onDismiss = { 
                 showAddDialog = false
+                editingItem = null
+            },
+            onSave = { subject, faculty, start, end, room ->
+                if (editingItem != null) {
+                    viewModel.updateTimetableItem(editingItem!!.id, subject, faculty, start, end, room)
+                } else {
+                    viewModel.addTimetableItem(subject, faculty, start, end, room)
+                }
+                showAddDialog = false
+                editingItem = null
             }
         )
     }
@@ -230,7 +273,11 @@ fun TimetableManagementScreen(
                         }
                     }
                     items(viewModel.timetable) { item ->
-                        TimetableItemCard(item, onDelete = { viewModel.deleteTimetableItem(item.id) })
+                        TimetableItemCard(
+                            item = item, 
+                            onEdit = { editingItem = item },
+                            onDelete = { viewModel.deleteTimetableItem(item.id) }
+                        )
                     }
                 }
             }
@@ -241,58 +288,88 @@ fun TimetableManagementScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TimetableDialog(
-    subjects: List<Subject>,
+    courses: List<Course>,
     facultyList: List<String>,
+    initialItem: TimetableEntity? = null,
     onDismiss: () -> Unit,
     onSave: (String, String, String, String, String) -> Unit
 ) {
-    var selectedSubject by remember { mutableStateOf<Subject?>(null) }
-    var selectedFaculty by remember { mutableStateOf<String?>(null) }
-    var startTime by remember { mutableStateOf("09:00") }
-    var endTime by remember { mutableStateOf("10:00") }
-    var room by remember { mutableStateOf("B-401") }
+    var selectedCourse by remember { 
+        mutableStateOf(courses.find { it.name == initialItem?.subject }) 
+    }
+    
+    var selectedFaculty by remember { 
+        mutableStateOf(initialItem?.faculty ?: selectedCourse?.assignedFaculty ?: "") 
+    }
 
-    var subjectExpanded by remember { mutableStateOf(false) }
+    // Update faculty if course changes and user hasn't manually set it yet
+    LaunchedEffect(selectedCourse) {
+        if (selectedCourse != null) {
+            selectedFaculty = selectedCourse?.assignedFaculty ?: ""
+        }
+    }
+    
+    var startTime by remember { mutableStateOf(initialItem?.startTime ?: "09:00") }
+    var endTime by remember { mutableStateOf(initialItem?.endTime ?: "10:00") }
+    var room by remember { mutableStateOf(initialItem?.room ?: "B-401") }
+
+    var courseExpanded by remember { mutableStateOf(false) }
     var facultyExpanded by remember { mutableStateOf(false) }
 
     Dialog(onDismissRequest = onDismiss) {
         AcadMateCard(variant = CardVariant.Elevated, contentPadding = 20.dp) {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Text("Schedule Class Slot", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text(
+                    text = if (initialItem != null) "Edit Class Slot" else "Schedule Class Slot", 
+                    style = MaterialTheme.typography.titleLarge, 
+                    fontWeight = FontWeight.Bold
+                )
 
-                // Subject Dropdown
+                // Course Selection Dropdown
                 ExposedDropdownMenuBox(
-                    expanded = subjectExpanded,
-                    onExpandedChange = { subjectExpanded = !subjectExpanded }
+                    expanded = courseExpanded,
+                    onExpandedChange = { courseExpanded = !courseExpanded }
                 ) {
                     AcadMateTextField(
-                        value = selectedSubject?.name ?: "Select Subject",
+                        value = selectedCourse?.name ?: initialItem?.subject ?: "Select Course",
                         onValueChange = {},
                         readOnly = true,
-                        label = "Subject",
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = subjectExpanded) },
+                        label = "Course",
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = courseExpanded) },
                         modifier = Modifier.menuAnchor().fillMaxWidth()
                     )
-                    ExposedDropdownMenu(expanded = subjectExpanded, onDismissRequest = { subjectExpanded = false }) {
-                        subjects.forEach { sub ->
-                            DropdownMenuItem(text = { Text(sub.name) }, onClick = {
-                                selectedSubject = sub
-                                subjectExpanded = false
-                            })
+                    ExposedDropdownMenu(expanded = courseExpanded, onDismissRequest = { courseExpanded = false }) {
+                        courses.forEach { course ->
+                            DropdownMenuItem(
+                                text = { 
+                                    Column {
+                                        Text(course.name, fontWeight = FontWeight.Bold)
+                                        Text(
+                                            text = "Default: ${course.assignedFaculty ?: "Unassigned"}",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                }, 
+                                onClick = {
+                                    selectedCourse = course
+                                    courseExpanded = false
+                                }
+                            )
                         }
                     }
                 }
 
-                // Faculty Dropdown
+                // Faculty Selection Dropdown (Manual override)
                 ExposedDropdownMenuBox(
                     expanded = facultyExpanded,
                     onExpandedChange = { facultyExpanded = !facultyExpanded }
                 ) {
                     AcadMateTextField(
-                        value = selectedFaculty ?: "Unassigned (TBA)",
+                        value = selectedFaculty.ifBlank { "Unassigned (TBA)" },
                         onValueChange = {},
                         readOnly = true,
-                        label = "Faculty",
+                        label = "Assigned Faculty",
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = facultyExpanded) },
                         modifier = Modifier.menuAnchor().fillMaxWidth()
                     )
@@ -300,7 +377,7 @@ fun TimetableDialog(
                         DropdownMenuItem(
                             text = { Text("Unassigned (TBA)") },
                             onClick = {
-                                selectedFaculty = null
+                                selectedFaculty = ""
                                 facultyExpanded = false
                             }
                         )
@@ -323,10 +400,18 @@ fun TimetableDialog(
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     TextButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("Cancel") }
                     AcadMateButton(
-                        text = "Schedule",
-                        onClick = { onSave(selectedSubject?.name ?: "", selectedFaculty ?: "", startTime, endTime, room) },
+                        text = if (initialItem != null) "Update" else "Schedule",
+                        onClick = { 
+                            onSave(
+                                selectedCourse?.name ?: initialItem?.subject ?: "", 
+                                selectedFaculty, 
+                                startTime, 
+                                endTime, 
+                                room
+                            ) 
+                        },
                         modifier = Modifier.weight(1f),
-                        enabled = selectedSubject != null
+                        enabled = (selectedCourse != null || initialItem != null)
                     )
                 }
             }
@@ -335,16 +420,21 @@ fun TimetableDialog(
 }
 
 @Composable
-fun TimetableItemCard(item: TimetableEntity, onDelete: () -> Unit) {
+fun TimetableItemCard(item: TimetableEntity, onEdit: () -> Unit, onDelete: () -> Unit) {
     AcadMateCard(variant = CardVariant.Flat, modifier = Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(item.subject, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
                 Text("${item.startTime} - ${item.endTime} • ${item.room}", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
-                Text("Faculty: ${item.faculty}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                Text("Faculty: ${item.faculty.ifBlank { "TBA" }}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
             }
-            IconButton(onClick = onDelete) {
-                Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.Red)
+            Row {
+                IconButton(onClick = onEdit) {
+                    Icon(Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.primary)
+                }
+                IconButton(onClick = onDelete) {
+                    Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.Red)
+                }
             }
         }
     }

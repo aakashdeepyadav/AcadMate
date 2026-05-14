@@ -41,6 +41,7 @@ import com.acadmate.attendance.ui.screens.FacultyMarkAttendanceScreen
 import com.acadmate.attendance.ui.screens.FacultySessionAttendanceScreen
 import com.acadmate.attendance.ui.screens.MarkAttendanceScreen
 import com.acadmate.dashboard.faculty.FacultyHomeScreen
+import com.acadmate.dashboard.faculty.FacultyTimetableScreen
 import com.acadmate.dashboard.student.StudentHomeScreen
 import com.acadmate.dashboard.student.AiSuiteScreen
 import com.acadmate.dashboard.student.TimetableScreen
@@ -60,6 +61,7 @@ import com.acadmate.ui.onboarding.OnboardingViewModel
 import com.acadmate.core.model.UserRole
 import com.acadmate.ui.splash.SplashScreen
 import com.acadmate.admin.ui.AdminDashboardScreen
+import com.acadmate.dashboard.faculty.SyllabusManagementScreen
 import com.acadmate.admin.ui.CreateUserScreen
 import com.acadmate.admin.ui.CampusSetupScreen
 import com.acadmate.assignments.ui.AssignmentListScreen
@@ -75,6 +77,7 @@ import com.acadmate.assignments.ui.ResourceManagerScreen
 import com.acadmate.admin.ui.CourseManagementScreen
 import com.acadmate.admin.ui.AuditLogScreen
 import com.acadmate.admin.ui.TimetableManagementScreen
+import com.acadmate.admin.ui.AiTimetableGeneratorScreen
 import com.acadmate.assignments.ui.AssignmentDetailScreen
 
 import com.acadmate.core.datastore.OnboardingDataStore
@@ -133,7 +136,7 @@ fun SimplePlaceholderScreen(
 }
 
 @Composable
-fun StudentMainShell(
+fun MainShell(
     navController: NavHostController,
     onboardingViewModel: OnboardingViewModel = hiltViewModel(),
     content: @Composable (PaddingValues) -> Unit
@@ -142,7 +145,6 @@ fun StudentMainShell(
     val currentDestination = navBackStackEntry?.destination
     val dataStore = onboardingViewModel.onboardingDataStore
     
-    // Scoped to the Activity/Shell to avoid constant recreation
     val authViewModel: AuthViewModel = hiltViewModel()
     val attendanceViewModel: com.acadmate.attendance.domain.AttendanceViewModel = hiltViewModel()
     
@@ -163,48 +165,42 @@ fun StudentMainShell(
             dataStore = dataStore
         )
     } else {
-        // Show bottom bar for main functional areas across all roles
+        val role by attendanceViewModel.userRole.collectAsStateWithLifecycle()
+
+        // Show bottom bar only for top-level destinations within the functional graphs
         val showBottomBar = currentDestination?.hierarchy?.any { 
             it.route?.contains("MainGraph") == true ||
             it.route?.contains("AdminGraph") == true ||
-            it.route?.contains("AssignmentGraph") == true ||
-            it.route?.contains("Home") == true ||
-            it.route?.contains("Attendance") == true ||
-            it.route?.contains("AiSuite") == true ||
-            it.route?.contains("Timetable") == true ||
-            it.route?.contains("Profile") == true ||
-            it.route?.contains("CreateUser") == true ||
-            it.route?.contains("CourseManagement") == true
-        } == true && currentDestination?.hierarchy?.any { it.route?.contains("AuthGraph") == true } != true
-
-        val role by attendanceViewModel.userRole.collectAsStateWithLifecycle()
+            it.route?.contains("AssignmentGraph") == true
+        } == true && currentDestination?.hierarchy?.any { 
+            it.route?.contains("AuthGraph") == true ||
+            it.route?.contains("Splash") == true 
+        } != true
 
         Scaffold(
             bottomBar = {
-                if (showBottomBar) {
-                    role?.let { userRole ->
-                        AcadMateBottomNavigation(
-                            currentDestination = when {
-                                currentDestination?.hasRoute(Routes.Home::class) == true -> "home"
-                                currentDestination?.hasRoute(Routes.Attendance::class) == true -> "attendance"
-                                currentDestination?.hasRoute(Routes.AiSuite::class) == true -> "ai_suite"
-                                currentDestination?.hasRoute(Routes.Timetable::class) == true -> "schedule"
-                                currentDestination?.hasRoute(Routes.Profile::class) == true -> "profile"
-                                currentDestination?.hasRoute(Routes.AssignmentGraph::class) == true -> "tasks"
-                                currentDestination?.hasRoute(Routes.ResourceManager::class) == true -> "materials"
-                                currentDestination?.hasRoute(Routes.CreateUser::class) == true -> "users"
-                                currentDestination?.hasRoute(Routes.CourseManagement::class) == true -> "courses"
-                                else -> "home"
-                            },
-                            userRole = userRole,
-                            onNavigate = { route ->
-                                navController.navigate(route) {
-                                    popUpTo(navController.graph.findStartDestination().id)
-                                    launchSingleTop = true
-                                }
+                if (showBottomBar && role != null) {
+                    AcadMateBottomNavigation(
+                        currentDestination = when {
+                            currentDestination?.hasRoute(Routes.Home::class) == true -> "home"
+                            currentDestination?.hasRoute(Routes.Attendance::class) == true -> "attendance"
+                            currentDestination?.hasRoute(Routes.AiSuite::class) == true -> "ai_suite"
+                            currentDestination?.hasRoute(Routes.Timetable::class) == true -> "schedule"
+                            currentDestination?.hasRoute(Routes.Profile::class) == true -> "profile"
+                            currentDestination?.hasRoute(Routes.AssignmentGraph::class) == true -> "tasks"
+                            currentDestination?.hasRoute(Routes.ResourceManager::class) == true -> "materials"
+                            currentDestination?.hasRoute(Routes.CreateUser::class) == true -> "users"
+                            currentDestination?.hasRoute(Routes.CourseManagement::class) == true -> "courses"
+                            else -> "home"
+                        },
+                        userRole = role!!,
+                        onNavigate = { route ->
+                            navController.navigate(route) {
+                                popUpTo(navController.graph.findStartDestination().id)
+                                launchSingleTop = true
                             }
-                        )
-                    }
+                        }
+                    )
                 }
             },
             contentWindowInsets = WindowInsets(0, 0, 0, 0)
@@ -219,7 +215,7 @@ fun AppNavGraph(
     navController: NavHostController,
     startDestination: Any = Routes.Splash
 ) {
-    StudentMainShell(navController) { padding: PaddingValues ->
+    MainShell(navController) { padding: PaddingValues ->
         NavHost(
             navController = navController,
             startDestination = startDestination,
@@ -395,6 +391,7 @@ fun AppNavGraph(
                                 onAddUserClick = { navController.navigate(Routes.CreateUser) },
                                 onManageCoursesClick = { navController.navigate(Routes.CourseManagement) },
                                 onScheduleClick = { navController.navigate(Routes.TimetableManagement) },
+                                onAiScheduleClick = { navController.navigate(Routes.AiTimetableGenerator) },
                                 onAuditLogClick = { navController.navigate(Routes.AuditLog) },
                                 onSettingsClick = { navController.navigate(Routes.CampusSetup) },
                                 onSignOut = {
@@ -414,8 +411,10 @@ fun AppNavGraph(
                                         "Notice Board" -> navController.navigate(Routes.NoticeBoard)
                                         "Materials" -> navController.navigate(Routes.ResourceManager)
                                         "Leave Management" -> navController.navigate(Routes.LeaveManagement)
+                                        "Timetable" -> navController.navigate(Routes.Timetable)
                                         "View Attendance" -> navController.navigate(Routes.Attendance)
                                         "Gradebook" -> navController.navigate(Routes.Gradebook)
+                                        "Manage Syllabus" -> navController.navigate(Routes.ManageSyllabus)
                                     }
                                 },
                                 onClassClick = { classId, hour ->
@@ -437,7 +436,7 @@ fun AppNavGraph(
                                         "Lecture" -> navController.navigate(Routes.LectureNotes)
                                         "Doubt" -> navController.navigate(Routes.DoubtMarketplace)
                                         "Focus" -> navController.navigate(Routes.FocusMode)
-                                        "Mark Attendance" -> navController.navigate(Routes.MarkAttendance(studentUiState.nextClass))
+                                        "Mark Attendance" -> navController.navigate(Routes.ActiveSessionsBrowser)
                                         "Assignments" -> navController.navigate(Routes.AssignmentGraph)
                                         "Materials" -> navController.navigate(Routes.ResourceManager)
                                         "Attendance" -> navController.navigate(Routes.Attendance)
@@ -470,7 +469,17 @@ fun AppNavGraph(
                     val route: Routes.MarkAttendance = backStackEntry.toRoute()
                     AttendanceSecurityWrapper(
                         classId = route.classId,
-                        onNavigateBack = { navController.popBackStack() }
+                        onNavigateBack = { navController.popBackStack() },
+                        onGoToProfile = { navController.navigate(Routes.Profile) }
+                    )
+                }
+
+                composable<Routes.ActiveSessionsBrowser> {
+                    com.acadmate.attendance.ui.screens.ActiveSessionsBrowserScreen(
+                        onNavigateBack = { navController.popBackStack() },
+                        onSessionClick = { classId -> 
+                            navController.navigate(Routes.MarkAttendance(classId)) 
+                        }
                     )
                 }
 
@@ -489,7 +498,10 @@ fun AppNavGraph(
                     val route: Routes.FacultyMarkAttendance = backStackEntry.toRoute()
                     FacultyMarkAttendanceScreen(
                         classId = route.classId,
-                        onBackClick = { navController.popBackStack() }
+                        onBackClick = { navController.popBackStack() },
+                        onViewAttendanceClick = { classId ->
+                            navController.navigate(Routes.FacultyAttendance(classId = classId))
+                        }
                     )
                 }
 
@@ -508,27 +520,18 @@ fun AppNavGraph(
                         onFeatureClick = { featureId ->
                             when (featureId) {
                                 "tutor" -> navController.navigate(Routes.AiChat())
-                                "syllabus" -> navController.navigate(Routes.SyllabusBrowser)
                                 "lecture_notes" -> navController.navigate(Routes.LectureNotes)
                                 "mock_exam" -> navController.navigate(Routes.MockExamSetup)
-                                "focus_mode" -> navController.navigate(Routes.FocusMode)
-                                "study_planner" -> navController.navigate(Routes.AiChat()) // Placeholder
+                                "interview_prep" -> navController.navigate(Routes.AiChat())
+                                "study_planner" -> navController.navigate(Routes.AiChat())
                             }
                         },
                         onNavigateBack = { navController.popBackStack() }
                     )
                 }
 
-                composable<Routes.FocusMode> {
-                    FocusModeScreen(onBackClick = { navController.popBackStack() })
-                }
-
                 composable<Routes.LectureNotes> {
-                    LectureNotesScreen(onBackClick = { navController.popBackStack() })
-                }
-
-                composable<Routes.DoubtMarketplace> {
-                    DoubtMarketplaceScreen(onBackClick = { navController.popBackStack() })
+                    com.acadmate.ai.lecture.LectureNotesScreen(onBackClick = { navController.popBackStack() })
                 }
 
                 composable<Routes.NoticeBoard> {
@@ -551,42 +554,16 @@ fun AppNavGraph(
 
                 composable<Routes.Syllabus>(
                     enterTransition = { slideInVertically(initialOffsetY = { it }) }
-                ) { backStackEntry ->
-                    val parentEntry = remember(backStackEntry) {
-                        navController.getBackStackEntry(Routes.MainGraph)
-                    }
-                    val viewModel: SyllabusAiViewModel = hiltViewModel(parentEntry)
-                    SyllabusUploadScreen(
-                        viewModel = viewModel,
-                        onBackClick = { navController.popBackStack() },
-                        onResultReady = { navController.navigate(Routes.SyllabusResult) }
-                    )
-                }
-
-                composable<Routes.SyllabusBrowser> {
+                ) {
                     SyllabusBrowserScreen(
                         onBackClick = { navController.popBackStack() }
                     )
                 }
 
-                composable<Routes.SyllabusResult> { backStackEntry ->
-                    val parentEntry = remember(backStackEntry) {
-                        navController.getBackStackEntry(Routes.MainGraph)
-                    }
-                    val viewModel: SyllabusAiViewModel = hiltViewModel(parentEntry)
-                    val uiState by viewModel.uiState.collectAsState()
-
-                    if (uiState is SyllabusUiState.Done) {
-                        SyllabusResultScreen(
-                            result = (uiState as SyllabusUiState.Done).result,
-                            onBackClick = { navController.popBackStack() },
-                            onChatClick = { navController.navigate(Routes.AiChat()) }
-                        )
-                    } else {
-                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator()
-                        }
-                    }
+                composable<Routes.ManageSyllabus> {
+                    com.acadmate.dashboard.faculty.SyllabusManagementScreen(
+                        onBackClick = { navController.popBackStack() }
+                    )
                 }
 
                 composable<Routes.MockExamSetup>(
@@ -607,9 +584,18 @@ fun AppNavGraph(
                 }
 
                 composable<Routes.Timetable> {
-                    TimetableScreen(
-                        onNavigateBack = { navController.popBackStack() }
-                    )
+                    val onboardingDataStore: OnboardingDataStore = hiltViewModel<com.acadmate.dashboard.student.TimetableViewModel>().onboardingDataStore
+                    val role by onboardingDataStore.selectedRole.collectAsState(initial = null)
+                    
+                    if (role == UserRole.FACULTY) {
+                        FacultyTimetableScreen(
+                            onNavigateBack = { navController.popBackStack() }
+                        )
+                    } else {
+                        TimetableScreen(
+                            onNavigateBack = { navController.popBackStack() }
+                        )
+                    }
                 }
 
                 composable<Routes.LeaveApplication> {
@@ -633,7 +619,9 @@ fun AppNavGraph(
                 composable<Routes.Profile> {
                 val authViewModel: AuthViewModel = hiltViewModel()
                 val onboardingViewModel: OnboardingViewModel = hiltViewModel()
+                val attendanceViewModel: com.acadmate.attendance.domain.AttendanceViewModel = hiltViewModel()
                 
+                val role by attendanceViewModel.userRole.collectAsStateWithLifecycle()
                 val isDarkModeStored by onboardingViewModel.onboardingDataStore.isDarkMode.collectAsState(initial = null)
                 val isDarkMode = isDarkModeStored ?: androidx.compose.foundation.isSystemInDarkTheme()
 
@@ -651,7 +639,8 @@ fun AppNavGraph(
                     onAboutClick = { navController.navigate(Routes.About) },
                     onPushNotificationsClick = { navController.navigate(Routes.ManageNotifications) },
                     isDarkMode = isDarkMode,
-                    onDarkModeToggle = { onboardingViewModel.setDarkMode(it) }
+                    onDarkModeToggle = { onboardingViewModel.setDarkMode(it) },
+                    userRole = role
                 )
             }
 
@@ -664,15 +653,15 @@ fun AppNavGraph(
                 }
 
                 composable<Routes.Privacy> {
-                    SimplePlaceholderScreen(title = "Privacy", onBackClick = { navController.popBackStack() })
+                    com.acadmate.dashboard.settings.PrivacyScreen(onBackClick = { navController.popBackStack() })
                 }
 
                 composable<Routes.Help> {
-                    SimplePlaceholderScreen(title = "Help & Support", onBackClick = { navController.popBackStack() })
+                    com.acadmate.dashboard.settings.HelpScreen(onBackClick = { navController.popBackStack() })
                 }
 
                 composable<Routes.About> {
-                    SimplePlaceholderScreen(title = "About AcadMate", onBackClick = { navController.popBackStack() })
+                    com.acadmate.dashboard.settings.AboutScreen(onBackClick = { navController.popBackStack() })
                 }
             }
 
@@ -683,6 +672,9 @@ fun AppNavGraph(
                     AdminDashboardScreen(
                         onAddUserClick = { navController.navigate(Routes.CreateUser) },
                         onManageCoursesClick = { navController.navigate(Routes.CourseManagement) },
+                        onSyllabusClick = { navController.navigate(Routes.ManageSyllabus) },
+                        onScheduleClick = { navController.navigate(Routes.TimetableManagement) },
+                        onAiScheduleClick = { navController.navigate(Routes.AiTimetableGenerator) },
                         onAuditLogClick = { navController.navigate(Routes.AuditLog) },
                         onSettingsClick = { navController.navigate(Routes.CampusSetup) },
                         onSignOut = {
@@ -691,6 +683,11 @@ fun AppNavGraph(
                                 popUpTo(navController.graph.id) { inclusive = true }
                             }
                         }
+                    )
+                }
+                composable<Routes.ManageSyllabus> {
+                    SyllabusManagementScreen(
+                        onBackClick = { navController.popBackStack() }
                     )
                 }
                 composable<Routes.CreateUser> {
@@ -710,6 +707,26 @@ fun AppNavGraph(
                 }
                 composable<Routes.TimetableManagement> {
                     TimetableManagementScreen(
+                        onBackClick = { navController.popBackStack() }
+                    )
+                }
+                composable<Routes.AiTimetableGenerator> {
+                    AiTimetableGeneratorScreen(
+                        onBackClick = { navController.popBackStack() }
+                    )
+                }
+                composable<Routes.CourseManagement> {
+                    CourseManagementScreen(
+                        onBackClick = { navController.popBackStack() }
+                    )
+                }
+                composable<Routes.TimetableManagement> {
+                    TimetableManagementScreen(
+                        onBackClick = { navController.popBackStack() }
+                    )
+                }
+                composable<Routes.AiTimetableGenerator> {
+                    AiTimetableGeneratorScreen(
                         onBackClick = { navController.popBackStack() }
                     )
                 }

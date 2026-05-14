@@ -68,13 +68,6 @@ fun AiSuiteScreen(
             gradientColors = listOf(Color(0xFF8B5CF6), Color(0xFFA855F7))
         ),
         AiFeature(
-            id = "syllabus",
-            title = "Syllabus Analysis",
-            description = "Upload your syllabus and get AI-powered gap analysis and study recommendations",
-            icon = Icons.Default.Analytics,
-            gradientColors = listOf(Color(0xFFF59E0B), Color(0xFFFCD34D))
-        ),
-        AiFeature(
             id = "lecture_notes",
             title = "Lecture Notes",
             description = "Record lectures and get AI-generated structured notes with key points",
@@ -89,10 +82,10 @@ fun AiSuiteScreen(
             gradientColors = listOf(Color(0xFFEF4444), Color(0xFFF87171))
         ),
         AiFeature(
-            id = "focus_mode",
-            title = "Focus Mode",
-            description = "Join group study sessions with AI-powered distraction blocking",
-            icon = Icons.Default.Group,
+            id = "interview_prep",
+            title = "Tech Interview Prep",
+            description = "Practice technical interviews with an AI bot tailored for CSE students",
+            icon = Icons.Default.Code,
             gradientColors = listOf(Color(0xFF06B6D4), Color(0xFF22D3EE))
         ),
         AiFeature(

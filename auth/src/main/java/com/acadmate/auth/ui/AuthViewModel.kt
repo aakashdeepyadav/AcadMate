@@ -44,6 +44,9 @@ class AuthViewModel @Inject constructor(
     private var verificationId: String? = null
     private var currentPhoneNumber: String? = null
     private var resendToken: PhoneAuthProvider.ForceResendingToken? = null
+    private var pendingEmail: String? = null
+    private var pendingPass: String? = null
+    private var pendingRegNo: String? = null
 
     private val _uiState = MutableStateFlow<AuthUiState>(AuthUiState.Idle)
     val uiState: StateFlow<AuthUiState> = _uiState
@@ -145,6 +148,10 @@ class AuthViewModel @Inject constructor(
                             "******${phoneNumber.takeLast(4)}"
                         } else "registered phone"
                         
+                        pendingEmail = email
+                        pendingPass = cleanPass
+                        pendingRegNo = cleanRegNo
+                        
                         _uiState.value = AuthUiState.RequirePhoneInput("ACTIVATE:$cleanRegNo", maskedPhone)
                     } else {
                         _uiState.value = AuthUiState.Error("Incorrect password for institutional account")
@@ -212,7 +219,7 @@ class AuthViewModel @Inject constructor(
         _uiState.value = AuthUiState.Loading
         viewModelScope.launch {
             try {
-                val userDoc = if (userId.startsWith("ACTIVATE:")) {
+                var userDoc = if (userId.startsWith("ACTIVATE:")) {
                     val regNo = userId.substringAfter("ACTIVATE:")
                     val query = firestore.collection("users").whereEqualTo("regNo", regNo).get().await()
                     query.documents.firstOrNull()
@@ -220,8 +227,18 @@ class AuthViewModel @Inject constructor(
                     firestore.collection("users").document(userId).get().await()
                 }
 
+                // If not found by UID, try searching by phoneNumber field
                 if (userDoc == null || !userDoc.exists()) {
-                    _uiState.value = AuthUiState.Error("User record not found")
+                    val cleanPhone = inputPhone.replace(Regex("[^\\d]"), "").takeLast(10)
+                    val phoneQuery = firestore.collection("users")
+                        .whereIn("phoneNumber", listOf(cleanPhone, "+91$cleanPhone"))
+                        .get()
+                        .await()
+                    userDoc = phoneQuery.documents.firstOrNull()
+                }
+
+                if (userDoc == null || !userDoc.exists()) {
+                    _uiState.value = AuthUiState.Error("User record not found. Please contact Admin.")
                     return@launch
                 }
 
@@ -237,6 +254,47 @@ class AuthViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 _uiState.value = AuthUiState.Error("Verification failed: ${e.message}")
+            }
+        }
+    }
+
+    fun resetPassword(regNo: String) {
+        val cleanRegNo = regNo.trim()
+        if (cleanRegNo.isEmpty()) {
+            _uiState.value = AuthUiState.Error("Please enter your Registration Number to reset password")
+            return
+        }
+
+        _uiState.value = AuthUiState.Loading
+        viewModelScope.launch {
+            try {
+                val selectedRole = onboardingDataStore.selectedRole.first()
+                if (selectedRole == null) {
+                    _uiState.value = AuthUiState.Error("Role not selected")
+                    return@launch
+                }
+
+                val userDoc = firestore.collection("users")
+                    .whereEqualTo("regNo", cleanRegNo)
+                    .whereEqualTo("role", selectedRole.name)
+                    .get()
+                    .await()
+
+                if (userDoc.isEmpty) {
+                    _uiState.value = AuthUiState.Error("No account found with this Registration Number for the selected role")
+                    return@launch
+                }
+
+                val email = userDoc.documents[0].getString("email") ?: ""
+                if (email.isEmpty()) {
+                    _uiState.value = AuthUiState.Error("No email associated with this account. Contact Admin.")
+                    return@launch
+                }
+
+                auth.sendPasswordResetEmail(email).await()
+                _uiState.value = AuthUiState.PasswordResetSent("Password reset link sent to your registered email.")
+            } catch (e: Exception) {
+                _uiState.value = AuthUiState.Error(e.message ?: "Failed to send reset email")
             }
         }
     }
@@ -372,36 +430,23 @@ class AuthViewModel @Inject constructor(
                         // Link phone credential if it's first login verification
                         user.linkWithCredential(credential).await()
                         
-                        // Check if we need to migrate document from regNo to UID
-                        val userByUid = firestore.collection("users").document(user.uid).get().await()
-                        if (!userByUid.exists()) {
-                            // Document might be stored under regNo (Admin created)
-                            // We need to find it and migrate
-                            val usersByPhone = firestore.collection("users")
-                                .whereEqualTo("phoneNumber", user.phoneNumber ?: "")
-                                .get()
-                                .await()
-                            
-                            val adminCreatedDoc = usersByPhone.documents.firstOrNull { 
-                                it.getBoolean("isFirstLogin") == true 
-                            }
+                        // Treat regNo as the authoritative document ID
+                        // We find the record by email or phone and update the 'id' field with UID
+                        // but we don't move the document.
+                        val usersByEmail = firestore.collection("users")
+                            .whereEqualTo("email", user.email ?: "")
+                            .get()
+                            .await()
+                        
+                        val adminCreatedDoc = usersByEmail.documents.firstOrNull()
 
-                            if (adminCreatedDoc != null) {
-                                val data = adminCreatedDoc.data?.toMutableMap() ?: mutableMapOf()
-                                data["id"] = user.uid
-                                data["isFirstLogin"] = false
-                                data["updatedAt"] = System.currentTimeMillis()
-                                
-                                // Create new document with UID
-                                firestore.collection("users").document(user.uid).set(data).await()
-                                
-                                // Delete old document (regNo based)
-                                firestore.collection("users").document(adminCreatedDoc.id).delete().await()
-                            }
-                        } else {
-                            // Document already exists under UID, just update flag
-                            firestore.collection("users").document(user.uid)
-                                .update("isFirstLogin", false)
+                        if (adminCreatedDoc != null) {
+                            firestore.collection("users").document(adminCreatedDoc.id)
+                                .update(
+                                    "id", user.uid,
+                                    "isFirstLogin", false,
+                                    "updatedAt", System.currentTimeMillis()
+                                )
                                 .await()
                         }
                     } catch (e: Exception) {
@@ -419,13 +464,73 @@ class AuthViewModel @Inject constructor(
                     onboardingDataStore.setOnboardingCompleted(true)
                     _uiState.value = AuthUiState.Verified(user.uid)
                 } else {
-                    val result = auth.signInWithCredential(credential).await()
-                    if (result.user != null) {
-                        userRepository.syncUserData(result.user!!.uid)
+                    // Try to create the user with email and password first if pendingEmail is set
+                    var createdUser = auth.currentUser
+                    if (pendingEmail != null && pendingPass != null && createdUser == null) {
+                        try {
+                            val authResult = auth.createUserWithEmailAndPassword(pendingEmail!!, pendingPass!!).await()
+                            createdUser = authResult.user
+                        } catch (e: Exception) {
+                            // If user already exists, sign them in
+                            if (e is com.google.firebase.auth.FirebaseAuthUserCollisionException || e.message?.contains("email address is already in use") == true) {
+                                val authResult = auth.signInWithEmailAndPassword(pendingEmail!!, pendingPass!!).await()
+                                createdUser = authResult.user
+                            } else {
+                                throw e
+                            }
+                        }
+                    }
+
+                    if (createdUser != null) {
+                        // Link the phone credential to the newly created email/password user
+                        try {
+                            createdUser.linkWithCredential(credential).await()
+                        } catch (e: Exception) {
+                            if (e.message?.contains("already been linked") == true || 
+                                e is com.google.firebase.auth.FirebaseAuthUserCollisionException) {
+                                Log.d("AuthViewModel", "User already linked to phone, proceeding")
+                            } else {
+                                throw e
+                            }
+                        }
+                        
+                        // Update the Firestore document
+                        if (pendingRegNo != null) {
+                            val userDocQuery = firestore.collection("users")
+                                .whereEqualTo("regNo", pendingRegNo)
+                                .get()
+                                .await()
+                            
+                            val adminCreatedDoc = userDocQuery.documents.firstOrNull()
+                            if (adminCreatedDoc != null) {
+                                firestore.collection("users").document(adminCreatedDoc.id)
+                                    .update(
+                                        "id", createdUser.uid,
+                                        "isFirstLogin", false,
+                                        "updatedAt", System.currentTimeMillis()
+                                    )
+                                    .await()
+                            }
+                        }
+
+                        userRepository.syncUserData(createdUser.uid)
                         onboardingDataStore.setOnboardingCompleted(true)
-                        _uiState.value = AuthUiState.Verified(result.user!!.uid)
+                        _uiState.value = AuthUiState.Verified(createdUser.uid)
+                        
+                        // Clear pending data
+                        pendingEmail = null
+                        pendingPass = null
+                        pendingRegNo = null
                     } else {
-                        _uiState.value = AuthUiState.Error("Sign-in failed")
+                        // Fallback to just phone auth if no pending data
+                        val result = auth.signInWithCredential(credential).await()
+                        if (result.user != null) {
+                            userRepository.syncUserData(result.user!!.uid)
+                            onboardingDataStore.setOnboardingCompleted(true)
+                            _uiState.value = AuthUiState.Verified(result.user!!.uid)
+                        } else {
+                            _uiState.value = AuthUiState.Error("Sign-in failed")
+                        }
                     }
                 }
             } catch (e: Exception) {

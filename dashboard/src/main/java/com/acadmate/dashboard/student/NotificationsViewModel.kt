@@ -16,6 +16,11 @@ class NotificationsViewModel @Inject constructor(
     val assignmentRemindersEnabled = onboardingDataStore.assignmentRemindersEnabled
     val examNotificationsEnabled = onboardingDataStore.examNotificationsEnabled
     val smartInsightsEnabled = onboardingDataStore.smartInsightsEnabled
+    
+    val autoAlarmsEnabled = onboardingDataStore.autoAlarmsEnabled
+    val alarmTone = onboardingDataStore.alarmTone
+    val alarmVibrationEnabled = onboardingDataStore.alarmVibrationEnabled
+    val alarmVolume = onboardingDataStore.alarmVolume
 
     fun setAttendanceAlertsEnabled(enabled: Boolean) {
         viewModelScope.launch {
@@ -38,6 +43,30 @@ class NotificationsViewModel @Inject constructor(
     fun setSmartInsightsEnabled(enabled: Boolean) {
         viewModelScope.launch {
             onboardingDataStore.setSmartInsightsEnabled(enabled)
+        }
+    }
+
+    fun setAutoAlarmsEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            onboardingDataStore.setAutoAlarmsEnabled(enabled)
+        }
+    }
+
+    fun setAlarmTone(tone: String) {
+        viewModelScope.launch {
+            onboardingDataStore.setAlarmTone(tone)
+        }
+    }
+
+    fun setAlarmVibrationEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            onboardingDataStore.setAlarmVibrationEnabled(enabled)
+        }
+    }
+
+    fun setAlarmVolume(volume: Int) {
+        viewModelScope.launch {
+            onboardingDataStore.setAlarmVolume(volume)
         }
     }
 }
