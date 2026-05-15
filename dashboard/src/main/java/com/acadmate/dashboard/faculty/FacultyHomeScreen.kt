@@ -11,6 +11,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -26,6 +27,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -72,66 +74,73 @@ fun FacultyHomeScreen(
                     FacultyHeader(
                         name = uiState.name, 
                         sessionCount = uiState.upcomingClasses.size,
+                        isAssigned = uiState.isAssignedAnySubject,
                         onProfileClick = onProfileClick, 
                         onRefresh = { viewModel.refresh() }
                     )
                 }
 
-                // Analytics Overview
-                item {
-                    FacultyAnalyticsRow(
-                        avgAttendance = uiState.averageAttendance,
-                        assignmentCount = uiState.assignmentCount
-                    )
-                }
-
-                // Live Class Status - High Priority
-                val liveClass = uiState.upcomingClasses.find { it.isLive }
-                if (liveClass != null) {
+                if (uiState.isAssignedAnySubject) {
+                    // Analytics Overview
                     item {
-                        LiveClassControlCard(
-                            liveClass = liveClass,
-                            onActionClick = onActionClick,
-                            onClassClick = onClassClick
+                        FacultyAnalyticsRow(
+                            avgAttendance = uiState.averageAttendance,
+                            assignmentCount = uiState.assignmentCount
                         )
                     }
-                }
 
-                // Management Hub (Quick Actions)
-                item {
-                    SectionHeader(title = "Faculty Hub")
-                    val currentOrNextClass = uiState.upcomingClasses.find { it.isLive }?.id 
-                        ?: uiState.upcomingClasses.firstOrNull()?.id
-                    QuickActionGrid(
-                        defaultClassId = currentOrNextClass,
-                        onActionClick = onActionClick
-                    )
-                }
+                    // Live Class Status - High Priority
+                    val liveClass = uiState.upcomingClasses.find { it.isLive }
+                    if (liveClass != null) {
+                        item {
+                            LiveClassControlCard(
+                                liveClass = liveClass,
+                                onActionClick = onActionClick,
+                                onClassClick = onClassClick
+                            )
+                        }
+                    }
 
-                // AI Tools for Faculty
-                item {
-                    SectionHeader(title = "Smart Teaching")
-                    FacultyAiTools(onActionClick)
-                }
-
-                // Recent Attendance Trends
-                item {
-                    SectionHeader(title = "Attendance Analytics")
-                    AttendanceTrendCard(uiState.attendanceTrends)
-                }
-
-                // Today's Teaching Schedule
-                item {
-                    SectionHeader(title = "Today's Sessions")
-                }
-
-                if (uiState.upcomingClasses.isEmpty()) {
+                    // Management Hub (Quick Actions)
                     item {
-                        EmptyScheduleState()
+                        SectionHeader(title = "Faculty Hub")
+                        val currentOrNextClass = uiState.upcomingClasses.find { it.isLive }?.id 
+                            ?: uiState.upcomingClasses.firstOrNull()?.id
+                        QuickActionGrid(
+                            defaultClassId = currentOrNextClass,
+                            onActionClick = onActionClick
+                        )
+                    }
+
+                    // AI Tools for Faculty
+                    item {
+                        SectionHeader(title = "Smart Teaching")
+                        FacultyAiTools(onActionClick)
+                    }
+
+                    // Recent Attendance Trends
+                    item {
+                        SectionHeader(title = "Attendance Analytics")
+                        AttendanceTrendCard(uiState.attendanceTrends)
+                    }
+
+                    // Today's Teaching Schedule
+                    item {
+                        SectionHeader(title = "Today's Sessions")
+                    }
+
+                    if (uiState.upcomingClasses.isEmpty()) {
+                        item {
+                            EmptyScheduleState()
+                        }
+                    } else {
+                        items(uiState.upcomingClasses) { facultyClass ->
+                            ClassItemCard(facultyClass, onClassClick)
+                        }
                     }
                 } else {
-                    items(uiState.upcomingClasses) { facultyClass ->
-                        ClassItemCard(facultyClass, onClassClick)
+                    item {
+                        UnassignedFacultyState()
                     }
                 }
                 
@@ -232,7 +241,7 @@ fun QuickActionGrid(
         FacultyAction("Leave Mgmt", Icons.AutoMirrored.Filled.EventNote, Color(0xFFEC4899), "Leave Management"),
         FacultyAction("Timetable", Icons.Default.CalendarMonth, Color(0xFFE17055), "Timetable"),
         FacultyAction("Announce", Icons.Default.Campaign, Color(0xFF6C5CE7), "Notice Board"),
-        FacultyAction("Syllabus", Icons.Default.MenuBook, Color(0xFF0EA5E9), "Manage Syllabus")
+        FacultyAction("Syllabus", Icons.AutoMirrored.Filled.MenuBook, Color(0xFF0EA5E9), "View Syllabus")
     )
 
     Column(verticalArrangement = Arrangement.spacedBy(LocalSpacing.current.sm)) {
@@ -261,7 +270,7 @@ fun QuickActionGrid(
                                 text = action.title, 
                                 style = MaterialTheme.typography.labelSmall, 
                                 fontWeight = FontWeight.Bold,
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                textAlign = TextAlign.Center
                             )
                         }
                     }
@@ -495,7 +504,46 @@ fun LiveClassControlCard(
 }
 
 @Composable
-fun FacultyHeader(name: String, sessionCount: Int, onProfileClick: () -> Unit, onRefresh: () -> Unit) {
+fun LazyItemScope.UnassignedFacultyState() {
+    Box(
+        modifier = Modifier.fillParentMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        AcadMateCard(
+            variant = CardVariant.Elevated,
+            modifier = Modifier.padding(24.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(
+                    Icons.Default.School, 
+                    contentDescription = null, 
+                    modifier = Modifier.size(64.dp),
+                    tint = MaterialTheme.colorScheme.outline
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    "Profile Pending Assignment",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    "You are not yet assigned to any subjects. Please contact the administrator to set up your teaching courses and syllabus.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun FacultyHeader(name: String, sessionCount: Int, isAssigned: Boolean, onProfileClick: () -> Unit, onRefresh: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth().statusBarsPadding(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -509,6 +557,7 @@ fun FacultyHeader(name: String, sessionCount: Int, onProfileClick: () -> Unit, o
                 letterSpacing = (-0.5).sp
             )
             val sessionText = when {
+                !isAssigned -> "Academic profile pending setup"
                 sessionCount == 0 -> "Your schedule is clear for today"
                 sessionCount == 1 -> "You have 1 class session today"
                 else -> "Ready for your $sessionCount scheduled classes?"

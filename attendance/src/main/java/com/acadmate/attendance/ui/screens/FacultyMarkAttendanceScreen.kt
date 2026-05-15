@@ -41,10 +41,20 @@ fun FacultyMarkAttendanceScreen(
     val uiState by viewModel.uiState.collectAsState()
     val isBroadcasting = uiState.isSessionActive
     var timeLeft by remember { mutableStateOf(600) } // 10 minutes
+    
+    var selectedSubject by remember { mutableStateOf(if (classId == "General") "" else classId) }
+    var expanded by remember { mutableStateOf(false) }
 
     LaunchedEffect(classId) {
         if (!isBroadcasting) {
             viewModel.loadSessionAttendance(classId)
+        }
+    }
+
+    // Auto-select first assigned course if none selected and it's a general request
+    LaunchedEffect(uiState.assignedCourses) {
+        if (selectedSubject.isBlank() && uiState.assignedCourses.isNotEmpty()) {
+            selectedSubject = uiState.assignedCourses.first()
         }
     }
 
@@ -69,7 +79,7 @@ fun FacultyMarkAttendanceScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text(if (isBroadcasting) "Live Session: $classId" else "Attendance: $classId") },
+                title = { Text(if (isBroadcasting) "Live Session: $selectedSubject" else "Attendance Setup") },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -94,7 +104,7 @@ fun FacultyMarkAttendanceScreen(
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 Text(
-                    text = "Live Student List",
+                    text = "Live Student List ($selectedSubject)",
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.padding(horizontal = 16.dp),
                     fontWeight = FontWeight.Bold
@@ -120,7 +130,7 @@ fun FacultyMarkAttendanceScreen(
                 }
             } else {
                 // Setup Card
-                Box(modifier = Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+                Box(modifier = Modifier.weight(1f).fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
                     AcadMateCard(variant = CardVariant.Elevated) {
                         Column(
                             modifier = Modifier.padding(24.dp),
@@ -128,7 +138,47 @@ fun FacultyMarkAttendanceScreen(
                         ) {
                             Icon(Icons.Default.Podcasts, null, modifier = Modifier.size(80.dp), tint = MaterialTheme.colorScheme.primary)
                             Spacer(modifier = Modifier.height(16.dp))
+                            
                             Text("Ready to start attendance?", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                            
+                            Spacer(modifier = Modifier.height(24.dp))
+                            
+                            // Subject Selection
+                            Text("Select Subject for this Session:", style = MaterialTheme.typography.labelMedium)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            
+                            ExposedDropdownMenuBox(
+                                expanded = expanded,
+                                onExpandedChange = { expanded = !expanded }
+                            ) {
+                                OutlinedTextField(
+                                    value = selectedSubject.ifBlank { "No assigned subjects" },
+                                    onValueChange = {},
+                                    readOnly = true,
+                                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                                    modifier = Modifier.menuAnchor().fillMaxWidth(),
+                                    shape = MaterialTheme.shapes.medium
+                                )
+                                
+                                if (uiState.assignedCourses.isNotEmpty()) {
+                                    ExposedDropdownMenu(
+                                        expanded = expanded,
+                                        onDismissRequest = { expanded = false }
+                                    ) {
+                                        uiState.assignedCourses.forEach { subject ->
+                                            DropdownMenuItem(
+                                                text = { Text(subject) },
+                                                onClick = {
+                                                    selectedSubject = subject
+                                                    expanded = false
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            Spacer(modifier = Modifier.height(16.dp))
                             Text("This will broadcast an ultrasonic signal for 10 minutes.", textAlign = TextAlign.Center, color = Color.Gray)
                         }
                     }
@@ -142,15 +192,16 @@ fun FacultyMarkAttendanceScreen(
                         text = if (isBroadcasting) "Stop Session" else "Start Session",
                         onClick = { 
                             if (isBroadcasting) viewModel.stopAttendanceSession() 
-                            else viewModel.startAttendanceSession(classId) 
+                            else viewModel.startAttendanceSession(selectedSubject) 
                         },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = isBroadcasting || selectedSubject.isNotBlank()
                     )
                     
                     if (isBroadcasting) {
                         Spacer(modifier = Modifier.height(8.dp))
                         TextButton(
-                            onClick = { onViewAttendanceClick(classId) },
+                            onClick = { onViewAttendanceClick(selectedSubject) },
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text("Manual Entry / View All Students")

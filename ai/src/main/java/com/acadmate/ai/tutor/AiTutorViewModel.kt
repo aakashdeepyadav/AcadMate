@@ -34,7 +34,30 @@ class AiTutorViewModel @Inject constructor(
     private val _isTyping = MutableStateFlow(false)
     val isTyping: StateFlow<Boolean> = _isTyping.asStateFlow()
 
+    private val _currentMode = MutableStateFlow("TUTOR")
+    val currentMode: StateFlow<String> = _currentMode.asStateFlow()
+
+    private val _realSyllabus = MutableStateFlow<List<com.acadmate.core.model.SubjectSyllabus>>(emptyList())
+    val realSyllabus: StateFlow<List<com.acadmate.core.model.SubjectSyllabus>> = _realSyllabus.asStateFlow()
+
     private var currentSessionId: String = UUID.randomUUID().toString()
+
+    init {
+        loadRealSyllabus()
+    }
+
+    private fun loadRealSyllabus() {
+        viewModelScope.launch {
+            try {
+                val snapshot = firestore.collection("syllabuses").get().await()
+                _realSyllabus.value = snapshot.toObjects(com.acadmate.core.model.SubjectSyllabus::class.java)
+            } catch (e: Exception) {}
+        }
+    }
+
+    fun setMode(mode: String) {
+        _currentMode.value = mode
+    }
 
     fun loadConversationHistory(sessionId: String) {
         currentSessionId = sessionId
@@ -147,24 +170,60 @@ class AiTutorViewModel @Inject constructor(
             _messages.value = _messages.value + userMessage + aiMessage
 
             try {
-                val context = getStudentContext()
-                val predefinedSyllabus = com.acadmate.core.model.PredefinedSyllabus.bTechCse6thSem.joinToString("\n") { sub ->
+                val studentContext = getStudentContext()
+                val currentSyllabusList = if (_realSyllabus.value.isNotEmpty()) _realSyllabus.value 
+                                          else com.acadmate.core.model.PredefinedSyllabus.bTechCse6thSem
+                                          
+                val dynamicSyllabusContext = currentSyllabusList.joinToString("\n") { sub ->
                     "${sub.subjectCode}: ${sub.subjectName} - ${sub.description}\nUnits: " + sub.units.joinToString("; ") { it.title }
                 }
 
-                val systemPrompt = """
+                val tutorPrompt = """
                     You are AcadMate AI, an elite B.Tech Computer Science Engineering Professor and academic tutor. 
                     You specialize in the current B.Tech CSE 6th Semester curriculum which includes:
-                    $predefinedSyllabus
+                    $dynamicSyllabusContext
 
                     When answering questions, provide concrete code examples (Java/Python/C++), discuss Time/Space complexity, 
                     and relate concepts to real-world software architecture where applicable.
                     Use the following student context to personalize your answers if relevant:
-                    $context
+                    $studentContext
                 """.trimIndent()
 
+                val interviewPrompt = """
+                    You are AcadMate Technical Interviewer. You are an expert engineer from a Top Tier tech company (like Google or Microsoft).
+                    Your goal is to prepare the student for high-stakes technical interviews.
+                    Focus on:
+                    1. Data Structures & Algorithms (DSA)
+                    2. System Design and Scalability
+                    3. Core CS fundamentals (OS, DBMS, Networking)
+                    4. Mock Behavioral questions (STAR method)
+                    
+                    When the student asks a question, explain the "Optimal" solution and common pitfalls.
+                    Institutional Syllabus for Reference:
+                    $dynamicSyllabusContext
+                    
+                    Student Context: $studentContext
+                """.trimIndent()
+
+                val plannerPrompt = """
+                    You are AcadMate Study Architect. Your goal is to create a hyper-personalized study roadmap for the student.
+                    Analyze their upcoming assignments, attendance, and syllabus gaps to prioritize what they should study next.
+                    Institutional Syllabus for Reference:
+                    $dynamicSyllabusContext
+                    
+                    Student Context: $studentContext
+                    
+                    When asked for a plan, provide a day-by-day or topic-by-topic schedule that focuses on bridging their "Syllabus Gaps" first.
+                """.trimIndent()
+
+                val systemPrompt = when(_currentMode.value) {
+                    "INTERVIEW" -> interviewPrompt
+                    "PLANNER" -> plannerPrompt
+                    else -> tutorPrompt
+                }
+
                 val unitContext = if (unit != null && subject != null) {
-                    val topics = com.acadmate.core.model.PredefinedSyllabus.bTechCse6thSem
+                    val topics = currentSyllabusList
                         .find { it.subjectName == subject }
                         ?.units?.find { it.title == unit }
                         ?.topics?.joinToString()

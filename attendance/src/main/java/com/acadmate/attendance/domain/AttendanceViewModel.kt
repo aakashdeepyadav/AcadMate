@@ -57,6 +57,9 @@ class AttendanceViewModel @Inject constructor(
             userRepository.getCurrentUser().collect { user ->
                 if (user != null) {
                     _userRole.value = user.role
+                    if (user.role == UserRole.STUDENT) {
+                        loadAttendanceHistory(user.regNo ?: user.id)
+                    }
                 }
             }
         }
@@ -79,6 +82,9 @@ class AttendanceViewModel @Inject constructor(
 
     private val _acousticStatus = MutableStateFlow("Listening...")
     val acousticStatus: StateFlow<String> = _acousticStatus.asStateFlow()
+
+    private val _userProfilePhoto = MutableStateFlow<String?>(null)
+    val userProfilePhoto: StateFlow<String?> = _userProfilePhoto.asStateFlow()
 
     private val _attendanceHistory = MutableStateFlow<List<AttendanceSession>>(emptyList())
     val attendanceHistory: StateFlow<List<AttendanceSession>> = _attendanceHistory
@@ -121,6 +127,7 @@ class AttendanceViewModel @Inject constructor(
                     return@launch
                 } else {
                     val profilePhoto = userDoc.getString("profilePictureUrl")
+                    _userProfilePhoto.value = profilePhoto
                     if (profilePhoto.isNullOrBlank()) {
                         _uiState.value = AttendanceUiState.Failed("Profile Photo Required: Please upload your photo in profile settings for Face ID matching.")
                         return@launch
@@ -382,6 +389,59 @@ class AttendanceViewModel @Inject constructor(
         _monthlySummaries.value = currentSummaries.sortedWith(
             compareBy<MonthlySummary> { it.year }.thenBy { it.month }.reversed()
         )
+    }
+
+    fun loadAttendanceHistory(studentId: String) {
+        viewModelScope.launch {
+            try {
+                val snapshot = firestore.collection("attendance")
+                    .whereEqualTo("studentId", studentId)
+                    .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
+                    .get()
+                    .await()
+                
+                val history = snapshot.documents.mapNotNull { doc ->
+                    val subject = doc.getString("subject") ?: ""
+                    val timestamp = doc.getLong("timestamp") ?: 0L
+                    val date = LocalDateTime.ofInstant(
+                        java.time.Instant.ofEpochMilli(timestamp),
+                        java.time.ZoneId.systemDefault()
+                    )
+                    
+                    AttendanceSession(
+                        id = doc.id,
+                        subject = subject,
+                        date = date,
+                        startTime = String.format("%02d:%02d", date.hour, date.minute),
+                        endTime = String.format("%02d:%02d", date.hour, date.minute), // End time logic can be refined
+                        faculty = doc.getString("faculty") ?: "Unknown",
+                        attended = true,
+                        markedAt = date
+                    )
+                }
+                
+                _attendanceHistory.value = history
+                updateMonthlySummariesFromHistory(history)
+            } catch (e: Exception) {
+                // Log or handle error
+            }
+        }
+    }
+
+    private fun updateMonthlySummariesFromHistory(history: List<AttendanceSession>) {
+        val summaries = history.groupBy { YearMonth.of(it.date.year, it.date.monthValue) }
+            .map { (yearMonth, sessions) ->
+                val attended = sessions.count { it.attended }
+                MonthlySummary(
+                    month = yearMonth.monthValue,
+                    year = yearMonth.year,
+                    totalClasses = sessions.size, // This is a simplification
+                    classesAttended = attended,
+                    attendancePercentage = (attended.toFloat() / sessions.size) * 100
+                )
+            }.sortedWith(compareBy<MonthlySummary> { it.year }.thenBy { it.month }.reversed())
+        
+        _monthlySummaries.value = summaries
     }
 
     fun getMonthlyAttendance(month: Int, year: Int): MonthlySummary? {

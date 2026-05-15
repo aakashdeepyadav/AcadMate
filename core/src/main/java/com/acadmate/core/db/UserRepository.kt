@@ -22,6 +22,10 @@ class UserRepository @Inject constructor(
         return userDao.getCurrentUser()
     }
 
+    suspend fun getUserById(userId: String): UserEntity? {
+        return userDao.getUser(userId).firstOrNull()
+    }
+
     suspend fun saveUserProfile(
         userId: String,
         name: String,
@@ -76,18 +80,29 @@ class UserRepository @Inject constructor(
         return try {
             // Update local database
             val currentUser = userDao.getUser(userId).firstOrNull()
+                ?: userDao.getCurrentUser().firstOrNull()
+                
             currentUser?.let {
                 val updatedUser = it.copy(
                     profilePictureUrl = profilePictureUrl,
                     updatedAt = System.currentTimeMillis()
                 )
-                userDao.updateUser(updatedUser)
+                userDao.insertUser(updatedUser) // Use insertUser (REPLACE) to be safe
             }
 
-            // Update Firestore
-            firestore.collection("users").document(userId)
-                .update("profilePictureUrl", profilePictureUrl, "updatedAt", System.currentTimeMillis())
-                .await()
+            // Update Firestore - Find the document by the 'id' field first
+            val query = firestore.collection("users").whereEqualTo("id", userId).get().await()
+            if (!query.isEmpty) {
+                val docId = query.documents[0].id
+                firestore.collection("users").document(docId)
+                    .update("profilePictureUrl", profilePictureUrl, "updatedAt", System.currentTimeMillis())
+                    .await()
+            } else {
+                // Fallback to updating by document ID directly if no document has this 'id' field
+                firestore.collection("users").document(userId)
+                    .update("profilePictureUrl", profilePictureUrl, "updatedAt", System.currentTimeMillis())
+                    .await()
+            }
 
             Result.success(Unit)
         } catch (e: Exception) {
@@ -98,15 +113,20 @@ class UserRepository @Inject constructor(
     suspend fun updateUserAddress(userId: String, address: String): Result<Unit> {
         return try {
             val currentUser = userDao.getUser(userId).firstOrNull()
+                ?: userDao.getCurrentUser().firstOrNull()
+                
             currentUser?.let {
                 val updatedUser = it.copy(
                     address = address,
                     updatedAt = System.currentTimeMillis()
                 )
-                userDao.updateUser(updatedUser)
+                userDao.insertUser(updatedUser)
             }
 
-            firestore.collection("users").document(userId)
+            val query = firestore.collection("users").whereEqualTo("id", userId).get().await()
+            val docId = if (!query.isEmpty) query.documents[0].id else userId
+
+            firestore.collection("users").document(docId)
                 .update("address", address, "updatedAt", System.currentTimeMillis())
                 .await()
 
@@ -119,6 +139,8 @@ class UserRepository @Inject constructor(
     suspend fun updateUserProfile(userId: String, name: String, email: String, address: String): Result<Unit> {
         return try {
             val currentUser = userDao.getUser(userId).firstOrNull()
+                ?: userDao.getCurrentUser().firstOrNull()
+                
             currentUser?.let {
                 val updatedUser = it.copy(
                     name = name,
@@ -126,10 +148,13 @@ class UserRepository @Inject constructor(
                     address = address,
                     updatedAt = System.currentTimeMillis()
                 )
-                userDao.updateUser(updatedUser)
+                userDao.insertUser(updatedUser)
             }
 
-            firestore.collection("users").document(userId)
+            val query = firestore.collection("users").whereEqualTo("id", userId).get().await()
+            val docId = if (!query.isEmpty) query.documents[0].id else userId
+
+            firestore.collection("users").document(docId)
                 .update(
                     mapOf(
                         "name" to name,

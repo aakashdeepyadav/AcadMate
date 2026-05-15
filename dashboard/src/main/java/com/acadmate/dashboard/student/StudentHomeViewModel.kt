@@ -31,7 +31,8 @@ data class HomeUiState(
     val studentRole: String = "",
     val studentAddress: String = "N/A",
     val attendancePercentage: Float = 0f,
-    val nextClass: String = "No Active Class",
+    val currentClass: String? = null,
+    val nextClass: String? = null,
     val nextClassIn: String = "--",
     val cgpaEstimate: Float = 0f,
     val isRefreshing: Boolean = false,
@@ -180,15 +181,12 @@ class StudentHomeViewModel @Inject constructor(
                 
                 // Find any live session (prefer the most recent one)
                 val activeSession = activeSessionsTask.documents.firstOrNull()
-                
-                val currentClass = if (activeSession != null) {
-                    activeSession.getString("classId") ?: "No Active Class"
-                } else {
-                    "No Active Class"
-                }
+                val liveClassId = activeSession?.getString("classId")
 
                 // Fetch Real Timetable for Today
                 val calendar = Calendar.getInstance()
+                val nowTime = String.format(Locale.getDefault(), "%02d:%02d", calendar.get(Calendar.HOUR_OF_DAY), calendar.get(Calendar.MINUTE))
+                
                 val dayOfWeek = when(calendar.get(Calendar.DAY_OF_WEEK)) {
                     Calendar.MONDAY -> 1
                     Calendar.TUESDAY -> 2
@@ -200,17 +198,40 @@ class StudentHomeViewModel @Inject constructor(
                     else -> 1
                 }
                 
-                val todaySchedule = timetableRepository.getTimetableForDaySync(dayOfWeek)
-                    .map { entity ->
-                        ScheduleItem(
-                            id = entity.id,
-                            subject = entity.subject,
-                            faculty = if (entity.faculty.isBlank()) "Not Assigned" else entity.faculty,
-                            room = entity.room,
-                            time = "${entity.startTime} - ${entity.endTime}",
-                            isCurrent = activeSession?.getString("classId") == entity.subject
-                        )
-                    }
+                val todayScheduleRaw = timetableRepository.getTimetableForDaySync(dayOfWeek)
+                
+                // Find currently running class from timetable or active sessions
+                val timetableCurrent = todayScheduleRaw.find { 
+                    nowTime >= it.startTime && nowTime <= it.endTime 
+                }
+                
+                val currentClassDisplay = liveClassId ?: timetableCurrent?.subject
+
+                // Find next upcoming class
+                val nextUpcoming = todayScheduleRaw.filter { it.startTime > nowTime }
+                    .minByOrNull { it.startTime }
+                
+                val nextClassIn = nextUpcoming?.let {
+                    try {
+                        val startParts = it.startTime.split(":")
+                        val startHour = startParts[0].toInt()
+                        val startMin = startParts[1].toInt()
+                        
+                        val diffMin = (startHour * 60 + startMin) - (calendar.get(Calendar.HOUR_OF_DAY) * 60 + calendar.get(Calendar.MINUTE))
+                        if (diffMin > 60) "${diffMin / 60}h ${diffMin % 60}m" else "${diffMin}m"
+                    } catch (e: Exception) { "--" }
+                } ?: "--"
+
+                val todaySchedule = todayScheduleRaw.map { entity ->
+                    ScheduleItem(
+                        id = entity.id,
+                        subject = entity.subject,
+                        faculty = if (entity.faculty.isBlank()) "Not Assigned" else entity.faculty,
+                        room = entity.room,
+                        time = "${entity.startTime} - ${entity.endTime}",
+                        isCurrent = liveClassId == entity.subject || (nowTime >= entity.startTime && nowTime <= entity.endTime)
+                    )
+                }
 
                 // Calculate course-wise progress based on attendance records
                 val progressMap = attendanceTask.documents.groupBy { it.getString("subject") ?: "Other" }
@@ -218,7 +239,9 @@ class StudentHomeViewModel @Inject constructor(
 
                 _uiState.value = _uiState.value.copy(
                     attendancePercentage = attendancePercentage,
-                    nextClass = currentClass,
+                    currentClass = currentClassDisplay,
+                    nextClass = nextUpcoming?.subject,
+                    nextClassIn = nextClassIn,
                     deadlines = deadlines,
                     schedule = todaySchedule,
                     courseProgress = progressMap,

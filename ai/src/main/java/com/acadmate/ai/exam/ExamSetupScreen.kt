@@ -21,10 +21,12 @@ fun ExamSetupScreen(
     viewModel: MockExamViewModel,
     onBackClick: () -> Unit
 ) {
-    val subjects = remember { 
-        com.acadmate.core.model.PredefinedSyllabus.bTechCse6thSem.map { it.subjectName } 
+    val availableSubjects by viewModel.availableSubjects.collectAsState()
+    val subjects = remember(availableSubjects) { 
+        if (availableSubjects.isNotEmpty()) availableSubjects.map { it.subjectName }
+        else com.acadmate.core.model.PredefinedSyllabus.bTechCse6thSem.map { it.subjectName } 
     }
-    var selectedSubject by remember { mutableStateOf(subjects.firstOrNull() ?: "General") }
+    var selectedSubject by remember(subjects) { mutableStateOf(subjects.firstOrNull() ?: "General") }
     var difficulty by remember { mutableFloatStateOf(1f) }
     var questionCount by remember { mutableIntStateOf(10) }
     var timeLimitEnabled by remember { mutableStateOf(true) }

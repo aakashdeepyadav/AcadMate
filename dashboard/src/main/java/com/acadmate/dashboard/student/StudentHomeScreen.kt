@@ -59,7 +59,7 @@ fun StudentHomeScreen(
     )
 
     // Show a prominent alert if a live session is active
-    val isLiveSessionActive = uiState.smartSuggestion?.contains("live session", ignoreCase = true) == true
+    val isLiveSessionActive = uiState.currentClass != null && uiState.smartSuggestion?.contains("live session", ignoreCase = true) == true
 
     MeshBackground {
         Scaffold(
@@ -107,6 +107,7 @@ fun StudentHomeScreen(
             item {
                 EnhancedAttendanceHero(
                     percentage = uiState.attendancePercentage,
+                    currentClass = uiState.currentClass,
                     nextClass = uiState.nextClass,
                     timeLeft = uiState.nextClassIn,
                     onMarkAttendance = { onActionClick("Mark Attendance") }
@@ -326,7 +327,8 @@ fun GreetingSection(name: String) {
 @Composable
 fun EnhancedAttendanceHero(
     percentage: Float,
-    nextClass: String,
+    currentClass: String?,
+    nextClass: String?,
     timeLeft: String,
     onMarkAttendance: () -> Unit
 ) {
@@ -404,8 +406,15 @@ fun EnhancedAttendanceHero(
                     ) {
                         Icon(Icons.Default.Event, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(8.dp))
+                        
+                        val displayText = when {
+                            currentClass != null -> "Ongoing: $currentClass"
+                            nextClass != null -> "Next Class: $nextClass in $timeLeft"
+                            else -> "No more classes today"
+                        }
+                        
                         Text(
-                            text = "Next Class: $nextClass in $timeLeft",
+                            text = displayText,
                             style = MaterialTheme.typography.bodySmall,
                             color = Color.White,
                             fontWeight = FontWeight.Medium
@@ -420,11 +429,16 @@ fun EnhancedAttendanceHero(
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(containerColor = Color.White),
                     shape = RoundedCornerShape(14.dp),
-                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp),
+                    enabled = currentClass != null
                 ) {
-                    Icon(Icons.Default.Fingerprint, contentDescription = null, tint = SoftBlue, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Fingerprint, contentDescription = null, tint = if (currentClass != null) SoftBlue else Color.Gray, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Verify My Attendance", fontWeight = FontWeight.ExtraBold, color = SoftBlue)
+                    Text(
+                        if (currentClass != null) "Verify My Attendance" else "Waiting for Session", 
+                        fontWeight = FontWeight.ExtraBold, 
+                        color = if (currentClass != null) SoftBlue else Color.Gray
+                    )
                 }
             }
         }

@@ -20,6 +20,7 @@ class AutoAlarmWorker @AssistedInject constructor(
     @Assisted appContext: Context,
     @Assisted workerParams: WorkerParameters,
     private val repository: TimetableRepository,
+    private val userRepository: com.acadmate.core.db.UserRepository,
     private val alarmScheduler: AndroidAlarmScheduler,
     private val onboardingDataStore: com.acadmate.core.datastore.OnboardingDataStore
 ) : CoroutineWorker(appContext, workerParams) {
@@ -31,7 +32,17 @@ class AutoAlarmWorker @AssistedInject constructor(
             
             // Skip if not logged in
             val currentUserId = auth.currentUser?.uid ?: return Result.success()
-            android.util.Log.d("AutoAlarmWorker", "Starting alarm scheduling for user: $currentUserId")
+            val user = userRepository.getUserById(currentUserId) 
+                ?: userRepository.getUserFromFirestore(currentUserId).getOrNull()
+                ?: return Result.success()
+            
+            // This functionality is for students and teachers only
+            if (user.role != com.acadmate.core.model.UserRole.STUDENT && 
+                user.role != com.acadmate.core.model.UserRole.FACULTY) {
+                return Result.success()
+            }
+
+            android.util.Log.d("AutoAlarmWorker", "Starting alarm scheduling for ${user.role}: $currentUserId")
 
             val autoAlarmsEnabled = onboardingDataStore.autoAlarmsEnabled.first()
             if (!autoAlarmsEnabled) return Result.success()
@@ -71,9 +82,16 @@ class AutoAlarmWorker @AssistedInject constructor(
                     else -> 1
                 }
                 
-                val dayClasses = repository.getTimetableForDaySync(dayIndex)
+                val allDayClasses = repository.getTimetableForDaySync(dayIndex)
                 
-                // User wants 1 hour before alarm specifically for the FIRST class of the day
+                // Filter based on role
+                val dayClasses = if (user.role == com.acadmate.core.model.UserRole.FACULTY) {
+                    allDayClasses.filter { it.faculty.contains(user.name, ignoreCase = true) }
+                } else {
+                    allDayClasses // Students see all classes for their section
+                }
+                
+                // User wants 1 hour before alarm specifically for the FIRST relevant class of the day
                 val firstClass = dayClasses.minByOrNull { it.startTime }
                 
                 dayClasses.forEach { classInfo ->

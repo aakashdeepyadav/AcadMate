@@ -34,7 +34,10 @@ fun FacultyTimetableScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val facultyUiState by hiltViewModel<FacultyHomeViewModel>().uiState.collectAsStateWithLifecycle()
+    val autoAlarmsEnabled by viewModel.autoAlarmsEnabled.collectAsStateWithLifecycle(initialValue = false)
     val daysOfWeek = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     val filteredEntries = remember(uiState.timetableEntries, facultyUiState.name) {
         uiState.timetableEntries.filter { 
@@ -58,10 +61,36 @@ fun FacultyTimetableScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { 
-                        viewModel.loadTimetableForDay(uiState.selectedDay)
-                    }) {
-                        Icon(Icons.Default.Sync, contentDescription = "Sync Schedule")
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "Auto-Alarms",
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.padding(end = 4.dp)
+                        )
+                        Switch(
+                            checked = autoAlarmsEnabled,
+                            onCheckedChange = { isEnabled ->
+                                viewModel.setAutoAlarmsEnabled(isEnabled)
+                                if (isEnabled) {
+                                    val workRequest = androidx.work.PeriodicWorkRequestBuilder<com.acadmate.core.alarms.AutoAlarmWorker>(6, java.util.concurrent.TimeUnit.HOURS)
+                                        .addTag("AutoAlarmWork")
+                                        .build()
+                                    androidx.work.WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+                                        "AutoAlarmWork",
+                                        androidx.work.ExistingPeriodicWorkPolicy.UPDATE,
+                                        workRequest
+                                    )
+                                } else {
+                                    androidx.work.WorkManager.getInstance(context).cancelUniqueWork("AutoAlarmWork")
+                                }
+                            },
+                            modifier = Modifier.padding(end = 8.dp)
+                        )
+                        IconButton(onClick = { 
+                            viewModel.loadTimetableForDay(uiState.selectedDay)
+                        }) {
+                            Icon(Icons.Default.Sync, contentDescription = "Sync Schedule")
+                        }
                     }
                 }
             )

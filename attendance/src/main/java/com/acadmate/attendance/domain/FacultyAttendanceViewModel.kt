@@ -8,6 +8,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.delay
@@ -34,13 +35,15 @@ data class FacultyAttendanceUiState(
     val sessionTime: String = "",
     val isSessionActive: Boolean = false,
     val sessionStartTime: Long? = null,
+    val assignedCourses: List<String> = emptyList(),
     val error: String? = null
 )
 
 @HiltViewModel
 class FacultyAttendanceViewModel @Inject constructor(
     private val acousticGenerator: AcousticTokenGenerator,
-    private val timetableRepository: com.acadmate.core.db.TimetableRepository
+    private val timetableRepository: com.acadmate.core.db.TimetableRepository,
+    private val userRepository: com.acadmate.core.db.UserRepository
 ) : ViewModel() {
 
     private val firestore = FirebaseFirestore.getInstance()
@@ -65,17 +68,46 @@ class FacultyAttendanceViewModel @Inject constructor(
             }
 
             val todaySchedule = timetableRepository.getTimetableForDaySync(dayOfWeek)
-            val currentFacultyName = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.displayName ?: ""
             
-            val isScheduled = todaySchedule.any { 
-                (it.id == classId || it.subject == classId) && 
-                it.faculty.contains(currentFacultyName, ignoreCase = true) 
+            // More robust name retrieval
+            val repoUser = userRepository.getCurrentUser().first()
+            val currentUid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: ""
+            val firestoreUser = if (repoUser == null && currentUid.isNotBlank()) {
+                userRepository.getUserFromFirestore(currentUid).getOrNull()
+            } else null
+            
+            val currentFacultyName = repoUser?.name ?: firestoreUser?.name ?: com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.displayName ?: ""
+            
+            val isScheduled = todaySchedule.any { item ->
+                // Flexible matching for ID or Subject names
+                val idMatch = item.id == classId || 
+                             item.subject.contains(classId, ignoreCase = true) || 
+                             classId.contains(item.subject, ignoreCase = true)
+                
+                val nameMatch = currentFacultyName.isNotBlank() && (
+                    item.faculty.contains(currentFacultyName, ignoreCase = true) || 
+                    currentFacultyName.contains(item.faculty, ignoreCase = true)
+                )
+                
+                idMatch && (nameMatch || item.faculty.isBlank() || item.faculty == "TBA" || item.faculty == "Not Assigned")
             }
 
-            if (!isScheduled && currentFacultyName.isNotBlank()) {
+            // Fallback: If it's a general request, allow if they have ANY class today
+            val canStartGeneral = (classId == "General" || classId.isBlank()) && todaySchedule.any { 
+                currentFacultyName.isNotBlank() && (
+                    it.faculty.contains(currentFacultyName, ignoreCase = true) || 
+                    currentFacultyName.contains(it.faculty, ignoreCase = true)
+                )
+            }
+
+            if (!isScheduled && !canStartGeneral) {
+                val timetableFaculty = todaySchedule.find { 
+                    it.id == classId || it.subject.contains(classId, ignoreCase = true) 
+                }?.faculty ?: "Unknown"
+                
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    error = "Access Denied: You do not have a scheduled class for '$classId' today."
+                    error = "Access Denied: Timetable mismatch. \nProfile: '$currentFacultyName'\nTimetable says: '$timetableFaculty'\nPlease ensure your name in Course Management matches your profile."
                 )
                 return@launch
             }
@@ -133,6 +165,19 @@ class FacultyAttendanceViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, className = classId)
             try {
+                // Fetch assigned courses for this faculty
+                val currentUser = userRepository.getCurrentUser().first()
+                val facultyName = currentUser?.name ?: ""
+                
+                if (facultyName.isNotBlank()) {
+                    val coursesSnapshot = firestore.collection("courses")
+                        .whereEqualTo("assignedFaculty", facultyName)
+                        .get()
+                        .await()
+                    val courseNames = coursesSnapshot.documents.map { it.getString("name") ?: "" }.filter { it.isNotBlank() }
+                    _uiState.value = _uiState.value.copy(assignedCourses = courseNames)
+                }
+
                 // 1. Fetch all students (Static for now, but could be specific to class)
                 val studentsSnapshot = firestore.collection("users")
                     .whereEqualTo("role", "STUDENT")

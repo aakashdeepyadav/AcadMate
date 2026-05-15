@@ -49,7 +49,7 @@ sealed class Routes {
     object AiSuite
 
     @Serializable
-    data class AiChat(val subject: String? = null)
+    data class AiChat(val subject: String? = null, val mode: String = "TUTOR")
 
     @Serializable
     object Syllabus

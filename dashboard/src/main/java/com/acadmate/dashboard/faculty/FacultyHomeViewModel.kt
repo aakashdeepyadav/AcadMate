@@ -33,6 +33,7 @@ data class FacultyHomeUiState(
     val attendanceTrends: List<Float> = emptyList(),
     val averageAttendance: String = "0%",
     val assignmentCount: String = "0",
+    val isAssignedAnySubject: Boolean = true,
     val isLoading: Boolean = false
 )
 
@@ -114,6 +115,14 @@ class FacultyHomeViewModel @Inject constructor(
                     )
                 }
             
+            // Check if this faculty is assigned to ANY course in the master list
+            val courseAssignmentSnapshot = firestore.collection("courses")
+                .whereEqualTo("assignedFaculty", facultyName)
+                .get()
+                .await()
+            
+            val isAssigned = !courseAssignmentSnapshot.isEmpty
+
             // 3. Calculate Real Attendance & Assignment Counts
             val attendanceSnapshot = firestore.collection("attendance")
                 .whereEqualTo("facultyId", userId)
@@ -138,7 +147,8 @@ class FacultyHomeViewModel @Inject constructor(
                 upcomingClasses = classes,
                 attendanceTrends = trends,
                 averageAttendance = avgAttendance,
-                assignmentCount = myAssignmentCount
+                assignmentCount = myAssignmentCount,
+                isAssignedAnySubject = isAssigned
             )
         } catch (e: Exception) { }
     }

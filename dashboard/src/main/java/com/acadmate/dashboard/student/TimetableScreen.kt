@@ -98,7 +98,7 @@ fun TimetableScreen(
                             onCheckedChange = { isEnabled ->
                                 viewModel.setAutoAlarmsEnabled(isEnabled)
                                 if (isEnabled) {
-                                    val workRequest = PeriodicWorkRequestBuilder<AutoAlarmWorker>(24, TimeUnit.HOURS)
+                                    val workRequest = PeriodicWorkRequestBuilder<AutoAlarmWorker>(6, TimeUnit.HOURS)
                                         .addTag("AutoAlarmWork")
                                         .build()
                                     WorkManager.getInstance(context).enqueueUniquePeriodicWork(

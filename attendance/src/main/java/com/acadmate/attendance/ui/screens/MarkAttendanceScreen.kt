@@ -15,6 +15,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,16 +23,22 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -44,8 +51,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import coil.compose.AsyncImage
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.acadmate.attendance.data.AttendanceUiState
@@ -65,7 +75,6 @@ import com.acadmate.attendance.ui.components.ProgressIndicator
 import com.acadmate.attendance.ui.components.AcousticWaveAnimation
 import com.acadmate.designsystem.components.MeshBackground
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.alpha
 import androidx.compose.foundation.Canvas
@@ -212,6 +221,7 @@ fun MarkAttendanceScreen(
 
                         AttendanceUiState.VerifyingIdentity -> {
                             Step2FaceDetection(
+                                viewModel = viewModel,
                                 detector = viewModel.faceDetector,
                                 onResult = { /* Handled by Flow in VM */ }
                             )
@@ -423,36 +433,78 @@ fun StepAcousticVerification(viewModel: AttendanceViewModel) {
 
 @Composable
 fun Step2FaceDetection(
+    viewModel: AttendanceViewModel,
     detector: FaceLivenessDetector,
     onResult: (LivenessResult) -> Unit
 ) {
     val livenessResult by detector.livenessResultFlow.collectAsStateWithLifecycle()
+    val profilePhoto by viewModel.userProfilePhoto.collectAsStateWithLifecycle()
 
     Column(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Box(
-            modifier = Modifier
-                .size(320.dp)
-                .background(
-                    MaterialTheme.colorScheme.surfaceVariant,
-                    shape = MaterialTheme.shapes.large
-                )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            CameraPreview(
-                modifier = Modifier.fillMaxSize(),
-                analyzer = detector
-            )
-            FaceOvalOverlay(modifier = Modifier.fillMaxSize())
+            // Live Camera
+            Box(
+                modifier = Modifier
+                    .size(240.dp)
+                    .background(
+                        MaterialTheme.colorScheme.surfaceVariant,
+                        shape = MaterialTheme.shapes.large
+                    )
+                    .clip(MaterialTheme.shapes.large)
+            ) {
+                CameraPreview(
+                    modifier = Modifier.fillMaxSize(),
+                    analyzer = detector
+                )
+                FaceOvalOverlay(modifier = Modifier.fillMaxSize())
+            }
+            
+            Spacer(modifier = Modifier.width(16.dp))
+            
+            // Reference Profile Photo
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Surface(
+                    modifier = Modifier
+                        .size(80.dp)
+                        .clip(CircleShape),
+                    color = MaterialTheme.colorScheme.primaryContainer
+                ) {
+                    if (profilePhoto != null) {
+                        AsyncImage(
+                            model = profilePhoto,
+                            contentDescription = "Reference",
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Icon(Icons.Default.Person, null, modifier = Modifier.padding(16.dp))
+                    }
+                }
+                Text("Reference", style = MaterialTheme.typography.labelSmall)
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                if (livenessResult is LivenessResult.Passed) {
+                    Icon(Icons.Default.CheckCircle, "Matched", tint = Color(0xFF10B981), modifier = Modifier.size(32.dp))
+                } else {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                }
+            }
         }
 
         Spacer(modifier = Modifier.height(24.dp))
 
         Text(
-            text = "Face Liveness Detection",
+            text = "Face Verification & Matching",
             style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center
         )
 
@@ -460,7 +512,7 @@ fun Step2FaceDetection(
 
         Text(
             text = if (livenessResult is LivenessResult.Failed) (livenessResult as LivenessResult.Failed).reason
-                   else "Look directly at the camera\nBlink naturally to confirm you're present",
+                   else "Blink naturally to verify your identity against the reference photo",
             style = MaterialTheme.typography.bodySmall,
             textAlign = TextAlign.Center,
             color = if (livenessResult is LivenessResult.Failed) MaterialTheme.colorScheme.error
@@ -470,7 +522,7 @@ fun Step2FaceDetection(
         Spacer(modifier = Modifier.height(16.dp))
 
         AttendanceStatusBanner(
-            message = "Status: Detecting face - eyes open, centered, and natural movement",
+            message = "Layer 3: Biometric Anti-Spoofing active",
             isError = livenessResult is LivenessResult.Failed
         )
     }

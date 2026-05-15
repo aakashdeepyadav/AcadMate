@@ -1,6 +1,8 @@
 package com.acadmate.ui.onboarding
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
@@ -12,55 +14,37 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.acadmate.R
 import com.acadmate.designsystem.components.AcadMateButton
+import com.acadmate.designsystem.components.MeshBackground
 import com.acadmate.designsystem.theme.AcadMateTheme
-import com.airbnb.lottie.compose.LottieAnimation
-import androidx.compose.foundation.pager.PagerState
-import androidx.compose.runtime.remember
-import com.airbnb.lottie.compose.LottieCompositionSpec
-import com.airbnb.lottie.compose.animateLottieCompositionAsState
-import com.airbnb.lottie.compose.rememberLottieComposition
-import com.airbnb.lottie.compose.LottieConstants
+import com.acadmate.designsystem.theme.LocalSpacing
+import com.airbnb.lottie.compose.*
 import kotlinx.coroutines.launch
 
 data class OnboardingPage(
     val title: String,
     val subtitle: String,
-    val lottieRes: Int
+    val lottieRes: Int,
+    val accentColor: Color
 )
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -71,127 +55,135 @@ fun OnboardingScreen(
 ) {
     val pages = listOf(
         OnboardingPage(
-            title = "Never Miss a Class",
-            subtitle = "Advanced BLE and face recognition ensure accurate attendance tracking",
-            lottieRes = R.raw.never_miss_class
+            title = "Zero Friction Attendance",
+            subtitle = "Proprietary 5-layer anti-proxy protocol using ultrasonic handshakes and ML liveness.",
+            lottieRes = R.raw.never_miss_class,
+            accentColor = Color(0xFF6366F1)
         ),
         OnboardingPage(
-            title = "Your AI Study Partner",
-            subtitle = "Get instant help with assignments, syllabus analysis, and exam prep",
-            lottieRes = R.raw.ai_study_partner
+            title = "Context-Aware AI",
+            subtitle = "Your learning, supercharged. Gemini-powered tutors, lecture notes, and exam simulators.",
+            lottieRes = R.raw.ai_study_partner,
+            accentColor = Color(0xFF8B5CF6)
         ),
         OnboardingPage(
-            title = "Everything in One Place",
-            subtitle = "Manage attendance, assignments, and notifications seamlessly",
-            lottieRes = R.raw.everything_one_place
+            title = "Elite Command Center",
+            subtitle = "A unified operating system for students, faculty, and administrators to eliminate institutional drag.",
+            lottieRes = R.raw.everything_one_place,
+            accentColor = Color(0xFFEC4899)
         )
     )
 
     val pagerState = rememberPagerState(pageCount = { pages.size })
     val scope = rememberCoroutineScope()
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .statusBarsPadding()
-            .navigationBarsPadding()
-    ) {
-        HorizontalPager(
-            state = pagerState,
-            modifier = Modifier.fillMaxSize()
-        ) { page ->
-            OnboardingPageContent(
-                page = pages[page],
-                pageIndex = page,
-                pagerState = pagerState
-            )
-        }
-
-        // Top Actions
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp)
-        ) {
-            TextButton(
-                onClick = onSkip,
-                modifier = Modifier.align(Alignment.TopEnd)
-            ) {
-                Text(
-                    text = "Skip",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-        }
-
-        // Bottom section with Indicators and Button
-        Column(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(32.dp)
-        ) {
-            // Page indicators
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                repeat(pages.size) { index ->
-                    val isSelected = pagerState.currentPage == index
-                    val width by animateDpAsState(
-                        targetValue = if (isSelected) 24.dp else 8.dp,
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                            stiffness = Spring.StiffnessLow
-                        ),
-                        label = "indicatorWidth"
-                    )
-
-                    Box(
-                        modifier = Modifier
-                            .height(8.dp)
-                            .width(width)
-                            .clip(CircleShape)
-                            .background(
-                                if (isSelected) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.surfaceVariant
+    MeshBackground {
+        Scaffold(
+            containerColor = Color.Transparent,
+            topBar = {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .padding(LocalSpacing.current.md),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    if (pagerState.currentPage != pages.lastIndex) {
+                        TextButton(onClick = onSkip) {
+                            Text(
+                                "Skip",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                             )
-                    )
+                        }
+                    }
                 }
             }
-
-            // Get Started button
-            Box(modifier = Modifier.height(56.dp)) {
-                this@Column.AnimatedVisibility(
-                    visible = pagerState.currentPage == pages.lastIndex,
-                    enter = fadeIn() + slideInVertically(initialOffsetY = { it / 2 }),
-                    exit = fadeOut() + slideOutVertically(targetOffsetY = { it / 2 })
-                ) {
-                    AcadMateButton(
-                        text = "Get Started",
-                        onClick = onGetStarted,
-                        modifier = Modifier.fillMaxWidth()
-                    )
+        ) { padding ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+            ) {
+                HorizontalPager(
+                    state = pagerState,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                ) { page ->
+                    OnboardingPageContent(pages[page], pagerState)
                 }
 
-                // Show "Next" button if not on last page
-                this@Column.AnimatedVisibility(
-                    visible = pagerState.currentPage != pages.lastIndex,
-                    enter = fadeIn(),
-                    exit = fadeOut()
+                // Bottom Controls
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(32.dp)
                 ) {
-                    AcadMateButton(
-                        text = "Next",
-                        onClick = {
-                            scope.launch {
-                                pagerState.animateScrollToPage(pagerState.currentPage + 1)
+                    // Page indicators
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        repeat(pages.size) { index ->
+                            val isSelected = pagerState.currentPage == index
+                            val width by animateDpAsState(
+                                targetValue = if (isSelected) 28.dp else 8.dp,
+                                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+                                label = "indicatorWidth"
+                            )
+
+                            Box(
+                                modifier = Modifier
+                                    .height(8.dp)
+                                    .width(width)
+                                    .clip(CircleShape)
+                                    .background(
+                                        if (isSelected) pages[index].accentColor
+                                        else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
+                                    )
+                            )
+                        }
+                    }
+
+                    // Main Action
+                    Box(modifier = Modifier.fillMaxWidth().height(64.dp)) {
+                        AnimatedContent(
+                            targetState = pagerState.currentPage == pages.lastIndex,
+                            transitionSpec = {
+                                (fadeIn() + slideInVertically { it / 2 }) togetherWith (fadeOut() + slideOutVertically { it / 2 })
+                            },
+                            label = "ActionButton"
+                        ) { isLastPage ->
+                            if (isLastPage) {
+                                AcadMateButton(
+                                    text = "Enter the Ecosystem",
+                                    onClick = onGetStarted,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            } else {
+                                Button(
+                                    onClick = {
+                                        scope.launch {
+                                            pagerState.animateScrollToPage(pagerState.currentPage + 1)
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                                    shape = RoundedCornerShape(16.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = pages[pagerState.currentPage].accentColor
+                                    )
+                                ) {
+                                    Text("Next", fontWeight = FontWeight.Bold)
+                                    Spacer(Modifier.width(8.dp))
+                                    Icon(Icons.AutoMirrored.Filled.ArrowForward, null, Modifier.size(18.dp))
+                                }
                             }
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                        }
+                    }
                 }
             }
         }
@@ -202,12 +194,9 @@ fun OnboardingScreen(
 @Composable
 fun OnboardingPageContent(
     page: OnboardingPage,
-    pageIndex: Int,
-    pagerState: PagerState
+    pagerState: androidx.compose.foundation.pager.PagerState
 ) {
-    val composition by rememberLottieComposition(
-        LottieCompositionSpec.RawRes(page.lottieRes)
-    )
+    val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(page.lottieRes))
     val progress by animateLottieCompositionAsState(
         composition = composition,
         iterations = LottieConstants.IterateForever
@@ -220,62 +209,39 @@ fun OnboardingPageContent(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // Lottie animation with parallax effect
         LottieAnimation(
             composition = composition,
             progress = { progress },
             modifier = Modifier
-                .size(300.dp)
+                .size(320.dp)
                 .graphicsLayer {
                     val pageOffset = pagerState.currentPageOffsetFraction
-                    translationX = pageOffset * 100f
-                    alpha = 1f - kotlin.math.abs(pageOffset) * 0.5f
+                    alpha = 1f - kotlin.math.abs(pageOffset)
+                    scaleX = 1f - kotlin.math.abs(pageOffset) * 0.2f
+                    scaleY = 1f - kotlin.math.abs(pageOffset) * 0.2f
                 }
         )
 
-        Spacer(modifier = Modifier.height(48.dp))
+        Spacer(modifier = Modifier.height(40.dp))
 
-        this@Column.AnimatedVisibility(
-            visible = true,
-            enter = slideInHorizontally(
-                initialOffsetX = { it },
-                animationSpec = tween(durationMillis = 600)
-            )
-        ) {
-            Text(
-                text = page.title,
-                style = MaterialTheme.typography.headlineLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-            )
-        }
+        Text(
+            text = page.title,
+            style = MaterialTheme.typography.displaySmall.copy(
+                fontWeight = FontWeight.Black,
+                letterSpacing = (-1).sp
+            ),
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center
+        )
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        this@Column.AnimatedVisibility(
-            visible = true,
-            enter = slideInVertically(
-                initialOffsetY = { it },
-                animationSpec = tween(durationMillis = 800)
-            )
-        ) {
-            Text(
-                text = page.subtitle,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-            )
-        }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun OnboardingScreenPreview() {
-    AcadMateTheme {
-        OnboardingScreen(
-            onGetStarted = {},
-            onSkip = {}
+        Text(
+            text = page.subtitle,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(horizontal = 16.dp)
         )
     }
 }

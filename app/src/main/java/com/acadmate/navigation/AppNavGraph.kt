@@ -61,7 +61,7 @@ import com.acadmate.ui.onboarding.OnboardingViewModel
 import com.acadmate.core.model.UserRole
 import com.acadmate.ui.splash.SplashScreen
 import com.acadmate.admin.ui.AdminDashboardScreen
-import com.acadmate.dashboard.faculty.SyllabusManagementScreen
+import com.acadmate.admin.ui.SyllabusManagementScreen
 import com.acadmate.admin.ui.CreateUserScreen
 import com.acadmate.admin.ui.CampusSetupScreen
 import com.acadmate.assignments.ui.AssignmentListScreen
@@ -414,7 +414,7 @@ fun AppNavGraph(
                                         "Timetable" -> navController.navigate(Routes.Timetable)
                                         "View Attendance" -> navController.navigate(Routes.Attendance)
                                         "Gradebook" -> navController.navigate(Routes.Gradebook)
-                                        "Manage Syllabus" -> navController.navigate(Routes.ManageSyllabus)
+                                        "View Syllabus" -> navController.navigate(Routes.SyllabusBrowser)
                                     }
                                 },
                                 onClassClick = { classId, hour ->
@@ -519,11 +519,11 @@ fun AppNavGraph(
                     AiSuiteScreen(
                         onFeatureClick = { featureId ->
                             when (featureId) {
-                                "tutor" -> navController.navigate(Routes.AiChat())
+                                "tutor" -> navController.navigate(Routes.AiChat(mode = "TUTOR"))
                                 "lecture_notes" -> navController.navigate(Routes.LectureNotes)
                                 "mock_exam" -> navController.navigate(Routes.MockExamSetup)
-                                "interview_prep" -> navController.navigate(Routes.AiChat())
-                                "study_planner" -> navController.navigate(Routes.AiChat())
+                                "interview_prep" -> navController.navigate(Routes.AiChat(mode = "INTERVIEW"))
+                                "study_planner" -> navController.navigate(Routes.AiChat(mode = "PLANNER"))
                             }
                         },
                         onNavigateBack = { navController.popBackStack() }
@@ -545,8 +545,11 @@ fun AppNavGraph(
                     deepLinks = listOf(
                         navDeepLink<Routes.AiChat>(basePath = "acadmate://ai/chat")
                     )
-                ) { _ ->
+                ) { backStackEntry ->
+                    val route: Routes.AiChat = backStackEntry.toRoute()
                     AiTutorScreen(
+                        mode = route.mode,
+                        initialSubject = route.subject,
                         viewModel = hiltViewModel(),
                         onBackClick = { navController.popBackStack() }
                     )

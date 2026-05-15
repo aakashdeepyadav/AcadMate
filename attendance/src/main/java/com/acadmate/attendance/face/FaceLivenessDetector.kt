@@ -107,15 +107,20 @@ class FaceLivenessDetector(context: Context) : ImageAnalysis.Analyzer {
     }
 
     private fun checkLiveness(detectionData: FaceDetectionData) {
-        if (frameCount > 60) {  // Check after collecting enough frames (~2 seconds at 30fps)
-            val result = if (detectionData.isLive && detectionData.blinkRate > 0.02f) {
-                LivenessResult.Passed
+        // Collect data for ~2.5 seconds (75 frames at 30fps)
+        if (frameCount > 75) {  
+            val result = if (detectionData.faceCentered && abs(detectionData.headPoseZ) < 45) {
+                // One full blink (close + open) results in blinksDetected >= 2
+                if (blinksDetected >= 1) {
+                    LivenessResult.Passed
+                } else {
+                    LivenessResult.Failed("Blink naturally to confirm you're present")
+                }
             } else {
                 when {
-                    !detectionData.eyesOpen -> LivenessResult.Failed("Please open your eyes")
                     !detectionData.faceCentered -> LivenessResult.Failed("Center your face in the frame")
                     abs(detectionData.headPoseZ) > 45 -> LivenessResult.Failed("Keep your head straight")
-                    else -> LivenessResult.Failed("No natural movement detected - keep your face still but natural")
+                    else -> LivenessResult.Failed("No movement detected")
                 }
             }
             _livenessResultFlow.value = result

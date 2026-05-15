@@ -33,25 +33,35 @@ import java.util.*
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AiTutorScreen(
+    mode: String = "TUTOR",
+    initialSubject: String? = null,
     viewModel: AiTutorViewModel = hiltViewModel(),
     onBackClick: () -> Unit
 ) {
     val messages by viewModel.messages.collectAsState()
     val suggestions by viewModel.suggestions.collectAsState()
     val isTyping by viewModel.isTyping.collectAsState()
+    val realSyllabus by viewModel.realSyllabus.collectAsState()
     
     val listState = rememberLazyListState()
     var inputText by remember { mutableStateOf("") }
-    var selectedSubject by remember { mutableStateOf<String?>(null) }
+    var selectedSubject by remember { mutableStateOf<String?>(initialSubject) }
     var selectedUnit by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(mode) {
+        viewModel.setMode(mode)
+    }
     
-    val subjects = remember { 
-        com.acadmate.core.model.PredefinedSyllabus.bTechCse6thSem.map { it.subjectName } 
+    val currentSyllabusList = if (realSyllabus.isNotEmpty()) realSyllabus 
+                             else com.acadmate.core.model.PredefinedSyllabus.bTechCse6thSem
+
+    val subjects = remember(currentSyllabusList) { 
+        currentSyllabusList.map { it.subjectName } 
     }
 
-    val units = remember(selectedSubject) {
+    val units = remember(selectedSubject, currentSyllabusList) {
         if (selectedSubject == null) emptyList()
-        else com.acadmate.core.model.PredefinedSyllabus.bTechCse6thSem
+        else currentSyllabusList
             .find { it.subjectName == selectedSubject }
             ?.units?.map { it.title } ?: emptyList()
     }
@@ -59,7 +69,15 @@ fun AiTutorScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("AI Tutor") },
+                title = { 
+                    Text(
+                        when(mode) {
+                            "INTERVIEW" -> "Interview Prep"
+                            "PLANNER" -> "Study Planner"
+                            else -> "AI Tutor"
+                        }
+                    ) 
+                },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")

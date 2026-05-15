@@ -8,6 +8,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import javax.inject.Inject
@@ -52,22 +53,43 @@ class MockExamViewModel @Inject constructor(
     private val generativeModel: GenerativeModel
 ) : ViewModel() {
 
+    private val firestore = com.google.firebase.firestore.FirebaseFirestore.getInstance()
     private val json = Json { ignoreUnknownKeys = true }
 
     private val _uiState = MutableStateFlow<ExamUiState>(ExamUiState.Setup)
     val uiState: StateFlow<ExamUiState> = _uiState.asStateFlow()
+
+    private val _availableSubjects = MutableStateFlow<List<com.acadmate.core.model.SubjectSyllabus>>(emptyList())
+    val availableSubjects: StateFlow<List<com.acadmate.core.model.SubjectSyllabus>> = _availableSubjects.asStateFlow()
 
     private val _timeLeft = MutableStateFlow(0)
     val timeLeft: StateFlow<Int> = _timeLeft.asStateFlow()
 
     private var timerJob: Job? = null
 
+    init {
+        loadAvailableSubjects()
+    }
+
+    private fun loadAvailableSubjects() {
+        viewModelScope.launch {
+            try {
+                val snapshot = firestore.collection("syllabuses").get().await()
+                val list = snapshot.toObjects(com.acadmate.core.model.SubjectSyllabus::class.java)
+                _availableSubjects.value = list
+            } catch (e: Exception) {
+                // Fallback if firestore fetch fails
+                _availableSubjects.value = com.acadmate.core.model.PredefinedSyllabus.bTechCse6thSem
+            }
+        }
+    }
+
     fun generateExam(subject: String, difficulty: String, count: Int, timeLimit: Int?) {
         viewModelScope.launch {
             _uiState.value = ExamUiState.Loading
             
             try {
-                val matchedSyllabus = com.acadmate.core.model.PredefinedSyllabus.bTechCse6thSem
+                val matchedSyllabus = _availableSubjects.value
                     .find { it.subjectName.equals(subject, ignoreCase = true) }
                 
                 val syllabusContext = matchedSyllabus?.let {
