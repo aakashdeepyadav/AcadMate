@@ -130,9 +130,10 @@ class FacultyHomeViewModel @Inject constructor(
                 .await()
             
             val totalStudentsCount = firestore.collection("users").whereEqualTo("role", "STUDENT").get().await().size().coerceAtLeast(1)
-            val avgAttendance = if (attendanceSnapshot.isEmpty) "0%" else "${(attendanceSnapshot.size().toFloat() / totalStudentsCount * 100).toInt()}%"
+            val avgAttendance = if (attendanceSnapshot.isEmpty) "0%" else "${(attendanceSnapshot.size().toFloat() / (totalStudentsCount * todaySchedule.size.coerceAtLeast(1)) * 100).toInt().coerceIn(0, 100)}%"
 
             val assignmentsSnapshot = firestore.collection("assignments")
+                .whereEqualTo("facultyId", userId)
                 .get()
                 .await()
             val myAssignmentCount = assignmentsSnapshot.size().toString()

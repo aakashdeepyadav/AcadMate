@@ -23,6 +23,12 @@ import com.acadmate.core.model.LeaveRequest
 import com.acadmate.core.model.LeaveStatus
 import com.acadmate.designsystem.components.*
 import com.acadmate.designsystem.theme.LocalSpacing
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DateRangePicker
+import androidx.compose.material3.rememberDateRangePickerState
+import androidx.compose.ui.window.DialogProperties
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -162,6 +168,7 @@ fun LeaveRequestItem(request: LeaveRequest) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ApplyLeaveDialog(
     onDismiss: () -> Unit,
@@ -169,17 +176,28 @@ fun ApplyLeaveDialog(
     isSubmitting: Boolean
 ) {
     var reason by remember { mutableStateOf("") }
-    // For demo, we just use current time as start and +2 days as end
-    val start = System.currentTimeMillis()
-    val end = start + (2 * 24 * 60 * 60 * 1000)
+    val dateRangePickerState = rememberDateRangePickerState()
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+        modifier = Modifier.fillMaxWidth().padding(16.dp),
         title = { Text("Apply for Leave", fontWeight = FontWeight.Bold) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
                 Text("Select date range and reason for your absence.", style = MaterialTheme.typography.bodySmall)
                 
+                DateRangePicker(
+                    state = dateRangePickerState,
+                    modifier = Modifier.height(400.dp),
+                    title = null,
+                    headline = null,
+                    showModeToggle = false
+                )
+
                 AcadMateTextField(
                     value = reason,
                     onValueChange = { reason = it },
@@ -193,8 +211,12 @@ fun ApplyLeaveDialog(
         confirmButton = {
             AcadMateButton(
                 text = "Submit Request",
-                onClick = { onApply(start, end, reason) },
-                enabled = reason.isNotBlank() && !isSubmitting,
+                onClick = { 
+                    val start = dateRangePickerState.selectedStartDateMillis ?: System.currentTimeMillis()
+                    val end = dateRangePickerState.selectedEndDateMillis ?: start
+                    onApply(start, end, reason) 
+                },
+                enabled = reason.isNotBlank() && dateRangePickerState.selectedStartDateMillis != null && !isSubmitting,
                 loading = isSubmitting
             )
         },

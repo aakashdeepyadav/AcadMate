@@ -34,8 +34,30 @@ class AssignmentViewModel @Inject constructor(
     private val _uploadSuccess = MutableStateFlow(false)
     val uploadSuccess: StateFlow<Boolean> = _uploadSuccess
 
+    private val _facultyCourses = MutableStateFlow<List<String>>(emptyList())
+    val facultyCourses: StateFlow<List<String>> = _facultyCourses
+
     init {
         loadAssignments()
+        loadFacultyCourses()
+    }
+
+    private fun loadFacultyCourses() {
+        viewModelScope.launch {
+            try {
+                val userId = auth.currentUser?.uid ?: return@launch
+                val userDoc = firestore.collection("users").document(userId).get().await()
+                val facultyName = userDoc.getString("name") ?: ""
+                
+                if (facultyName.isNotBlank()) {
+                    val snapshot = firestore.collection("courses")
+                        .whereEqualTo("assignedFaculty", facultyName)
+                        .get()
+                        .await()
+                    _facultyCourses.value = snapshot.documents.map { it.getString("name") ?: "" }.filter { it.isNotBlank() }
+                }
+            } catch (_: Exception) {}
+        }
     }
 
     fun loadAssignments() {

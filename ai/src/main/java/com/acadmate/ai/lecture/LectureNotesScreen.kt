@@ -3,9 +3,11 @@ package com.acadmate.ai.lecture
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -17,12 +19,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.acadmate.designsystem.components.AcadMateButton
 import com.acadmate.designsystem.theme.rememberAcadMateHapticFeedback
-import com.airbnb.lottie.compose.*
 import dev.jeziellago.compose.markdowntext.MarkdownText
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -153,7 +155,46 @@ private fun RecordingContent(onStop: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // Here we could add a Lottie animation for sound waves
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.size(200.dp)) {
+            val infiniteTransition = rememberInfiniteTransition(label = "wave")
+            
+            repeat(3) { index ->
+                val scale by infiniteTransition.animateFloat(
+                    initialValue = 1f,
+                    targetValue = 2f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(1500, delayMillis = index * 400),
+                        repeatMode = RepeatMode.Restart
+                    ),
+                    label = "scale"
+                )
+                val alpha by infiniteTransition.animateFloat(
+                    initialValue = 0.4f,
+                    targetValue = 0f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(1500, delayMillis = index * 400),
+                        repeatMode = RepeatMode.Restart
+                    ),
+                    label = "alpha"
+                )
+                
+                Box(
+                    modifier = Modifier
+                        .size(60.dp)
+                        .graphicsLayer(scaleX = scale, scaleY = scale, alpha = alpha)
+                        .background(MaterialTheme.colorScheme.primary, CircleShape)
+                )
+            }
+            
+            Icon(
+                Icons.Default.Mic, 
+                null, 
+                modifier = Modifier.size(48.dp), 
+                tint = MaterialTheme.colorScheme.primary
+            )
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
         Text("Listening...", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(16.dp))
         Text("Recording audio and preparing for AI processing...", color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -164,7 +205,7 @@ private fun RecordingContent(onStop: () -> Unit) {
             onClick = onStop,
             modifier = Modifier
                 .size(80.dp)
-                .background(MaterialTheme.colorScheme.errorContainer, shape = androidx.compose.foundation.shape.CircleShape)
+                .background(MaterialTheme.colorScheme.errorContainer, shape = CircleShape)
         ) {
             Icon(Icons.Default.Stop, contentDescription = "Stop", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(40.dp))
         }

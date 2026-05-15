@@ -45,6 +45,7 @@ class AutoAlarmWorker @AssistedInject constructor(
             android.util.Log.d("AutoAlarmWorker", "Starting alarm scheduling for ${user.role}: $currentUserId")
 
             val autoAlarmsEnabled = onboardingDataStore.autoAlarmsEnabled.first()
+            val alarmMinutesBefore = onboardingDataStore.alarmMinutesBefore.first()
             if (!autoAlarmsEnabled) return Result.success()
 
             val now = LocalDateTime.now()
@@ -116,13 +117,13 @@ class AutoAlarmWorker @AssistedInject constructor(
                             
                             val dateTag = "${targetCalendar.get(java.util.Calendar.DAY_OF_YEAR)}"
                             
-                            // 1 Hour Before Alarm (Mandatory for first class if auto-alarm is on)
-                            val alarmTimeOneHour = classDateTime.minusHours(1)
-                            if (alarmTimeOneHour.isAfter(now)) {
+                            // Dynamic Before Class Alarm
+                            val alarmTimeDynamic = classDateTime.minusMinutes(alarmMinutesBefore.toLong())
+                            if (alarmTimeDynamic.isAfter(now)) {
                                 alarmScheduler.schedule(AlarmItem(
-                                    id = "CLASS_1H_${classInfo.id}_$dateTag",
-                                    time = alarmTimeOneHour,
-                                    title = if (isFirstClass) "First Class in 1 Hour" else "Class in 1 Hour: ${classInfo.subject}",
+                                    id = "CLASS_DYN_${classInfo.id}_$dateTag",
+                                    time = alarmTimeDynamic,
+                                    title = if (isFirstClass) "First Class in ${if (alarmMinutesBefore >= 60) "${alarmMinutesBefore/60}h" else "${alarmMinutesBefore}m"}" else "Class in ${alarmMinutesBefore}m: ${classInfo.subject}",
                                     message = "Your session starts at ${classInfo.startTime} in ${classInfo.room}",
                                     type = "CLASS"
                                 ))

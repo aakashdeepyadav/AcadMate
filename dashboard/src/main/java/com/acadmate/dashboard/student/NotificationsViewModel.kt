@@ -21,6 +21,7 @@ class NotificationsViewModel @Inject constructor(
     val alarmTone = onboardingDataStore.alarmTone
     val alarmVibrationEnabled = onboardingDataStore.alarmVibrationEnabled
     val alarmVolume = onboardingDataStore.alarmVolume
+    val alarmMinutesBefore = onboardingDataStore.alarmMinutesBefore
 
     fun setAttendanceAlertsEnabled(enabled: Boolean) {
         viewModelScope.launch {
@@ -67,6 +68,12 @@ class NotificationsViewModel @Inject constructor(
     fun setAlarmVolume(volume: Int) {
         viewModelScope.launch {
             onboardingDataStore.setAlarmVolume(volume)
+        }
+    }
+
+    fun setAlarmMinutesBefore(minutes: Int) {
+        viewModelScope.launch {
+            onboardingDataStore.setAlarmMinutesBefore(minutes)
         }
     }
 }

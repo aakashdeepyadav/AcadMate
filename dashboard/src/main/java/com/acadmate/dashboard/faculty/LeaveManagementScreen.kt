@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
@@ -15,10 +14,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.acadmate.core.model.LeaveRequest
 import com.acadmate.core.model.LeaveStatus
 import com.acadmate.designsystem.components.*
+import com.acadmate.designsystem.theme.LocalSpacing
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
@@ -46,7 +47,7 @@ fun LeaveManagementScreen(
                     .get()
                     .await()
                 requests = snapshot.toObjects(LeaveRequest::class.java)
-            } catch (e: Exception) { } finally {
+            } catch (_: Exception) { } finally {
                 isLoading = false
             }
         }
@@ -65,44 +66,66 @@ fun LeaveManagementScreen(
                         )
                     ).await()
                 loadRequests()
-            } catch (e: Exception) { }
+            } catch (_: Exception) { }
         }
     }
 
     LaunchedEffect(Unit) { loadRequests() }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Leave Requests", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                }
-            )
-        }
-    ) { padding ->
-        if (isLoading) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-        } else {
-            LazyColumn(
-                modifier = Modifier.padding(padding).fillMaxSize(),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                if (requests.isEmpty()) {
-                    item {
-                        Box(Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
-                            Text("No pending requests", color = Color.Gray)
+    MeshBackground {
+        Scaffold(
+            containerColor = Color.Transparent,
+            topBar = {
+                TopAppBar(
+                    title = { Text("Leave Requests", fontWeight = FontWeight.Black) },
+                    navigationIcon = {
+                        IconButton(onClick = onBackClick) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = { loadRequests() }) {
+                            Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+                )
+            }
+        ) { padding ->
+            if (isLoading) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.padding(padding).fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    if (requests.isEmpty()) {
+                        item {
+                            Box(modifier = Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Icon(Icons.Default.DoneAll, null, modifier = Modifier.size(80.dp), tint = Color.LightGray)
+                                    Spacer(Modifier.height(16.dp))
+                                    Text(
+                                        "All caught up!", 
+                                        style = MaterialTheme.typography.headlineSmall,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        "No pending leave requests to review.",
+                                        color = Color.Gray,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                            }
                         }
                     }
-                }
-                items(requests) { request ->
-                    PendingLeaveItem(
-                        request = request,
-                        onAction = { status, note -> updateStatus(request.id, status, note) }
-                    )
+                    items(requests) { request ->
+                        PendingLeaveItem(
+                            request = request,
+                            onAction = { status, note -> updateStatus(request.id, status, note) }
+                        )
+                    }
                 }
             }
         }
@@ -114,39 +137,56 @@ fun PendingLeaveItem(
     request: LeaveRequest,
     onAction: (LeaveStatus, String) -> Unit
 ) {
-    val sdf = SimpleDateFormat("MMM dd", Locale.getDefault())
+    val sdf = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
     var responseNote by remember { mutableStateOf("") }
 
     AcadMateCard(variant = CardVariant.Flat) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Column {
-                    Text(request.studentName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Text(
-                        "${sdf.format(Date(request.startDate))} - ${sdf.format(Date(request.endDate))}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary
+                        text = request.studentName,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                    Text(
+                        text = "${sdf.format(Date(request.startDate))} - ${sdf.format(Date(request.endDate))}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold
                     )
                 }
-                Box(
-                    modifier = Modifier.background(Color(0xFFF5A623).copy(alpha = 0.1f), CircleShape).padding(horizontal = 8.dp, vertical = 2.dp)
+                Surface(
+                    color = Color(0xFFF5A623).copy(alpha = 0.1f),
+                    shape = CircleShape
                 ) {
-                    Text("PENDING", color = Color(0xFFF5A623), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black)
+                    Text(
+                        text = "PENDING",
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                        color = Color(0xFFF5A623),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Black
+                    )
                 }
             }
             
-            Spacer(Modifier.height(8.dp))
-            Text(request.reason, style = MaterialTheme.typography.bodyMedium)
+            Spacer(Modifier.height(12.dp))
+            Text(text = "Reason:", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+            Text(text = request.reason, style = MaterialTheme.typography.bodyMedium)
             
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(20.dp))
             AcadMateTextField(
                 value = responseNote,
                 onValueChange = { responseNote = it },
                 label = "Faculty Response (Optional)",
-                placeholder = "Reason for approval/rejection"
+                placeholder = "Add a note for the student..."
             )
             
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(16.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedButton(
                     onClick = { onAction(LeaveStatus.REJECTED, responseNote) },
@@ -155,12 +195,11 @@ fun PendingLeaveItem(
                 ) {
                     Text("Reject")
                 }
-                Button(
+                AcadMateButton(
+                    text = "Approve",
                     onClick = { onAction(LeaveStatus.APPROVED, responseNote) },
                     modifier = Modifier.weight(1f)
-                ) {
-                    Text("Approve")
-                }
+                )
             }
         }
     }

@@ -1,5 +1,11 @@
 package com.acadmate.dashboard.student
 
+import android.app.Activity
+import android.content.Intent
+import android.media.RingtoneManager
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -9,6 +15,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -23,6 +30,7 @@ fun ManageNotificationsScreen(
     onBackClick: () -> Unit,
     viewModel: NotificationsViewModel = hiltViewModel()
 ) {
+    val context = LocalContext.current
     val attendanceAlerts by viewModel.attendanceAlertsEnabled.collectAsStateWithLifecycle(initialValue = true)
     val assignmentReminders by viewModel.assignmentRemindersEnabled.collectAsStateWithLifecycle(initialValue = true)
     val examNotifications by viewModel.examNotificationsEnabled.collectAsStateWithLifecycle(initialValue = true)
@@ -31,7 +39,30 @@ fun ManageNotificationsScreen(
     val autoAlarms by viewModel.autoAlarmsEnabled.collectAsStateWithLifecycle(initialValue = false)
     val alarmVibration by viewModel.alarmVibrationEnabled.collectAsStateWithLifecycle(initialValue = true)
     val alarmVolume by viewModel.alarmVolume.collectAsStateWithLifecycle(initialValue = 70)
-    val alarmTone by viewModel.alarmTone.collectAsStateWithLifecycle(initialValue = "Default")
+    val alarmMinutesBefore by viewModel.alarmMinutesBefore.collectAsStateWithLifecycle(initialValue = 60)
+    val alarmToneUri by viewModel.alarmTone.collectAsStateWithLifecycle(initialValue = "Default")
+
+    val ringtonePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val uri = result.data?.getParcelableExtra<Uri>(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
+            if (uri != null) {
+                viewModel.setAlarmTone(uri.toString())
+            }
+        }
+    }
+
+    val currentRingtoneName = remember(alarmToneUri) {
+        if (alarmToneUri == "Default") "Default"
+        else {
+            try {
+                RingtoneManager.getRingtone(context, Uri.parse(alarmToneUri)).getTitle(context)
+            } catch (e: Exception) {
+                "Custom Tone"
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -124,6 +155,20 @@ fun ManageNotificationsScreen(
                         )
                         
                         Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                            Text("Time Before Class", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("${alarmMinutesBefore}m", style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(32.dp))
+                                Slider(
+                                    value = alarmMinutesBefore.toFloat(),
+                                    onValueChange = { viewModel.setAlarmMinutesBefore(it.toInt()) },
+                                    valueRange = 10f..120f,
+                                    steps = 10,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+
+                        Column(modifier = Modifier.padding(vertical = 8.dp)) {
                             Text("Alarm Volume", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text("${alarmVolume}%", style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(32.dp))
@@ -152,9 +197,18 @@ fun ManageNotificationsScreen(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(text = "Alarm Tone", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
-                                Text(text = alarmTone, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                                Text(text = currentRingtoneName, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                             }
-                            TextButton(onClick = { /* In a real app, open ringtone picker */ }) {
+                            TextButton(onClick = { 
+                                val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+                                    putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM)
+                                    putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "Select Alarm Tone")
+                                    putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, if (alarmToneUri == "Default") null else Uri.parse(alarmToneUri))
+                                    putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
+                                    putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, false)
+                                }
+                                ringtonePickerLauncher.launch(intent)
+                            }) {
                                 Text("Change")
                             }
                         }

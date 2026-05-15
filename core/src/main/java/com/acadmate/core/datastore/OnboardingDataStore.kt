@@ -33,6 +33,7 @@ class OnboardingDataStore @Inject constructor(
     private val alarmToneKey = stringPreferencesKey("alarm_tone")
     private val alarmVibrationEnabledKey = booleanPreferencesKey("alarm_vibration_enabled")
     private val alarmVolumeKey = stringPreferencesKey("alarm_volume")
+    private val alarmMinutesBeforeKey = stringPreferencesKey("alarm_minutes_before")
 
     val selectedRole: Flow<UserRole?> = context.dataStore.data.map { preferences ->
         preferences[selectedRoleKey]?.let { UserRole.fromString(it) }
@@ -92,6 +93,10 @@ class OnboardingDataStore @Inject constructor(
         preferences[alarmVolumeKey]?.toIntOrNull() ?: 70
     }
 
+    val alarmMinutesBefore: Flow<Int> = context.dataStore.data.map { preferences ->
+        preferences[alarmMinutesBeforeKey]?.toIntOrNull() ?: 60
+    }
+
     suspend fun setAutoAlarmsEnabled(enabled: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[autoAlarmsEnabledKey] = enabled
@@ -137,6 +142,12 @@ class OnboardingDataStore @Inject constructor(
     suspend fun setAlarmVolume(volume: Int) {
         context.dataStore.edit { preferences ->
             preferences[alarmVolumeKey] = volume.toString()
+        }
+    }
+
+    suspend fun setAlarmMinutesBefore(minutes: Int) {
+        context.dataStore.edit { preferences ->
+            preferences[alarmMinutesBeforeKey] = minutes.toString()
         }
     }
 

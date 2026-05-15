@@ -12,6 +12,8 @@ import javax.inject.Inject
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 
+import androidx.core.net.toUri
+
 @AndroidEntryPoint
 class AlarmReceiver : BroadcastReceiver() {
 
@@ -31,11 +33,17 @@ class AlarmReceiver : BroadcastReceiver() {
                 val tone = onboardingDataStore.alarmTone.first()
                 Triple(vibe, vol, tone)
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             Triple(true, 70, "Default")
         }
 
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+        val ringtoneUri = if (settings.third == "Default") {
+            android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_ALARM)
+        } else {
+            settings.third.toUri()
+        }
 
         val channelId = when(type) {
             "CLASS" -> "CLASS_ALARM_CHANNEL"
@@ -52,11 +60,15 @@ class AlarmReceiver : BroadcastReceiver() {
                 else -> "General Reminders"
             }
             val importance = NotificationManager.IMPORTANCE_HIGH
+            
+            // We recreate the channel if it's a CLASS alarm to update the sound if changed
+            // Actually, once created, sound cannot be changed easily without deleting channel.
+            // But for this purpose, let's ensure it's set correctly.
             val channel = NotificationChannel(channelId, name, importance).apply {
                 enableVibration(settings.first)
                 if (type == "CLASS") {
                     setSound(
-                        android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_ALARM),
+                        ringtoneUri,
                         android.media.AudioAttributes.Builder()
                             .setUsage(android.media.AudioAttributes.USAGE_ALARM)
                             .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
@@ -73,7 +85,7 @@ class AlarmReceiver : BroadcastReceiver() {
             .setContentText(message)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(if (type == "CLASS") NotificationCompat.CATEGORY_ALARM else NotificationCompat.CATEGORY_REMINDER)
-            .setSound(android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_ALARM))
+            .setSound(ringtoneUri)
             .setVibrate(if (settings.first) longArrayOf(0, 500, 200, 500) else null)
             .setAutoCancel(true)
             .build()

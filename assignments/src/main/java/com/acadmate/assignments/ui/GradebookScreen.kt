@@ -30,9 +30,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.acadmate.designsystem.components.AcadMateCard
 import com.acadmate.designsystem.components.CardVariant
 import com.acadmate.designsystem.theme.LocalSpacing
+import com.acadmate.designsystem.components.MeshBackground
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
-
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
@@ -51,6 +51,7 @@ data class StudentGrade(
 @HiltViewModel
 class GradebookViewModel @Inject constructor() : ViewModel() {
     private val firestore = FirebaseFirestore.getInstance()
+    private val auth = com.google.firebase.auth.FirebaseAuth.getInstance()
     var assignmentName by mutableStateOf("Loading...")
     var maxMarks = 100
     
@@ -69,7 +70,11 @@ class GradebookViewModel @Inject constructor() : ViewModel() {
     private fun loadAssignments() {
         viewModelScope.launch {
             try {
-                val snapshot = firestore.collection("assignments").get().await()
+                val userId = auth.currentUser?.uid ?: return@launch
+                val snapshot = firestore.collection("assignments")
+                    .whereEqualTo("facultyId", userId)
+                    .get()
+                    .await()
                 val list = snapshot.toObjects(com.acadmate.core.model.Assignment::class.java)
                 _assignments.clear()
                 _assignments.addAll(list)
@@ -159,110 +164,124 @@ fun GradebookScreen(
     viewModel: GradebookViewModel = hiltViewModel(),
     onBackClick: () -> Unit
 ) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Gradebook", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { /* Save all grades to backend */ }) {
-                        Icon(Icons.Default.Save, contentDescription = "Save All")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
+    MeshBackground {
+        Scaffold(
+            containerColor = Color.Transparent,
+            topBar = {
+                TopAppBar(
+                    title = { Text("Gradebook", fontWeight = FontWeight.Black) },
+                    navigationIcon = {
+                        IconButton(onClick = onBackClick) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = Color.Transparent
+                    )
                 )
-            )
-        },
-        containerColor = MaterialTheme.colorScheme.background
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
-            // Assignment Selector
-            LazyRow(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                contentPadding = PaddingValues(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(viewModel.assignments) { assignment ->
-                    FilterChip(
-                        selected = viewModel.selectedAssignmentId == assignment.id,
-                        onClick = { viewModel.selectAssignment(assignment.id) },
-                        label = { Text(assignment.title) }
-                    )
-                }
             }
-
-            // Assignment Header Info
-            AcadMateCard(
+        ) { padding ->
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(LocalSpacing.current.md),
-                variant = CardVariant.Gradient,
-                gradientColors = listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.tertiary),
-                cornerRadius = 16.dp,
-                contentPadding = 20.dp
+                    .fillMaxSize()
+                    .padding(padding)
             ) {
-                Column {
-                    Text(
-                        text = "Grading Assignment",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = Color.White.copy(alpha = 0.8f)
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = viewModel.assignmentName,
-                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                        color = Color.White
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                if (viewModel.assignments.isEmpty()) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(Icons.Default.Person, null, modifier = Modifier.size(80.dp), tint = Color.LightGray)
+                            Spacer(Modifier.height(16.dp))
+                            Text("No assignments to grade", fontWeight = FontWeight.Bold)
+                            Text("Create an assignment first to view submissions.", color = Color.Gray)
+                        }
+                    }
+                } else {
+                    // Assignment Selector
+                    LazyRow(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                        contentPadding = PaddingValues(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text(
-                            text = "Max Marks: ${viewModel.maxMarks}",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Color.White.copy(alpha = 0.9f)
-                        )
-                        Surface(
-                            color = Color.White.copy(alpha = 0.2f),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Text(
-                                text = "${viewModel.students.count { it.grade != null }} / ${viewModel.students.size} Graded",
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                color = Color.White
+                        items(viewModel.assignments) { assignment ->
+                            FilterChip(
+                                selected = viewModel.selectedAssignmentId == assignment.id,
+                                onClick = { viewModel.selectAssignment(assignment.id) },
+                                label = { Text(assignment.title) }
                             )
                         }
                     }
-                }
-            }
 
-            // Student List
-            LazyColumn(
-                modifier = Modifier.fillMaxWidth(),
-                contentPadding = PaddingValues(
-                    start = LocalSpacing.current.md,
-                    end = LocalSpacing.current.md,
-                    bottom = 100.dp
-                ),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(viewModel.students) { student ->
-                    StudentGradingRow(
-                        student = student,
-                        onMarksChanged = { viewModel.updateMarks(student.id, it) }
-                    )
+                    // Assignment Header Info
+                    AcadMateCard(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(LocalSpacing.current.md),
+                        variant = CardVariant.Gradient,
+                        gradientColors = listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.tertiary),
+                        cornerRadius = 16.dp,
+                        contentPadding = 20.dp
+                    ) {
+                        Column {
+                            Text(
+                                text = "Grading Assignment",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = Color.White.copy(alpha = 0.8f)
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = viewModel.assignmentName,
+                                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                                color = Color.White
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Max Marks: ${viewModel.maxMarks}",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = Color.White.copy(alpha = 0.9f)
+                                )
+                                Surface(
+                                    color = Color.White.copy(alpha = 0.2f),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Text(
+                                        text = "${viewModel.students.count { it.grade != null }} / ${viewModel.students.size} Graded",
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                        color = Color.White
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Student List
+                    if (viewModel.students.isEmpty()) {
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text("No students enrolled in this section", color = Color.Gray)
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxWidth(),
+                            contentPadding = PaddingValues(
+                                start = LocalSpacing.current.md,
+                                end = LocalSpacing.current.md,
+                                bottom = 100.dp
+                            ),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(viewModel.students) { student ->
+                                StudentGradingRow(
+                                    student = student,
+                                    onMarksChanged = { viewModel.updateMarks(student.id, it) }
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
