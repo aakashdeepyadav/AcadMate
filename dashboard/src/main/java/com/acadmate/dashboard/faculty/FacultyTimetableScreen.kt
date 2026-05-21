@@ -40,8 +40,10 @@ fun FacultyTimetableScreen(
     val context = androidx.compose.ui.platform.LocalContext.current
 
     val filteredEntries = remember(uiState.timetableEntries, facultyUiState.name) {
-        uiState.timetableEntries.filter { 
-            it.faculty.contains(facultyUiState.name, ignoreCase = true) 
+        if (facultyUiState.name.isBlank()) uiState.timetableEntries
+        else uiState.timetableEntries.filter { 
+            it.faculty.contains(facultyUiState.name, ignoreCase = true) || 
+            facultyUiState.name.contains(it.faculty, ignoreCase = true)
         }
     }
 

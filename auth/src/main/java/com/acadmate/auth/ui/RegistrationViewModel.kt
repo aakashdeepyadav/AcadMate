@@ -32,6 +32,31 @@ class RegistrationViewModel @Inject constructor(
     private val _uiState = MutableStateFlow<RegistrationUiState>(RegistrationUiState.Idle)
     val uiState: StateFlow<RegistrationUiState> = _uiState
 
+    private val _departments = MutableStateFlow<List<String>>(emptyList())
+    val departments: StateFlow<List<String>> = _departments
+
+    private val _sections = MutableStateFlow<List<String>>(emptyList())
+    val sections: StateFlow<List<String>> = _sections
+
+    init {
+        loadInstitutionData()
+    }
+
+    private fun loadInstitutionData() {
+        viewModelScope.launch {
+            try {
+                val doc = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                    .collection("institution").document("config").get().await()
+                if (doc.exists()) {
+                    @Suppress("UNCHECKED_CAST")
+                    _departments.value = doc.get("departments") as? List<String> ?: emptyList()
+                    @Suppress("UNCHECKED_CAST")
+                    _sections.value = doc.get("sections") as? List<String> ?: emptyList()
+                }
+            } catch (e: Exception) {}
+        }
+    }
+
     private var currentPhoneNumber: String? = null
 
     private val callbacks = object : PhoneAuthProvider.OnVerificationStateChangedCallbacks() {
@@ -113,6 +138,7 @@ class RegistrationViewModel @Inject constructor(
         password: String,
         enrollmentNumber: String?,
         department: String?,
+        section: String? = null,
         role: UserRole,
         profilePictureUrl: String? = null
     ) {
@@ -168,6 +194,7 @@ class RegistrationViewModel @Inject constructor(
                     phoneNumber = currentUser.phoneNumber ?: "",
                     enrollmentNumber = enrollmentNumber,
                     department = department,
+                    section = section,
                     role = role.name.lowercase(),
                     profilePictureUrl = profilePictureUrl
                 )

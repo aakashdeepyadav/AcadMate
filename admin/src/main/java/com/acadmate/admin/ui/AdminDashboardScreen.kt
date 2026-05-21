@@ -265,6 +265,7 @@ fun QuickActionsGrid(
     val actions = listOf(
         QuickAction("User Mgmt", Icons.Default.People, Color(0xFF6C5CE7), onAddUser),
         QuickAction("Course Mgmt", Icons.Default.Class, Color(0xFF00B894), onManageCourses),
+        QuickAction("Dept & Sections", Icons.Default.Settings, Color(0xFFE17055), onSettingsClick),
         QuickAction("Syllabus", Icons.Default.MenuBook, Color(0xFF0EA5E9), onSyllabus),
         QuickAction("Schedule", Icons.Default.CalendarMonth, Color(0xFFE17055), onSchedule),
         QuickAction("AI Scheduler", Icons.Default.AutoAwesome, Color(0xFF6C5CE7), onAiScheduleClick),

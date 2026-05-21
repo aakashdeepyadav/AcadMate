@@ -21,6 +21,7 @@ data class UserEntity(
     val phoneNumber: String,
     val regNo: String? = null,
     val department: String? = null,
+    val section: String? = null,
     val role: UserRole,
     val profilePictureUrl: String? = null,
     val address: String? = null,

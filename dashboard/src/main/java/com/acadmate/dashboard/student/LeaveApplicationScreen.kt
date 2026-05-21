@@ -39,14 +39,16 @@ fun LeaveApplicationScreen(
     viewModel: LeaveViewModel = hiltViewModel()
 ) {
     val requests by viewModel.leaveRequests.collectAsState()
+    val facultyList by viewModel.facultyList.collectAsState()
     val isSubmitting by viewModel.isSubmitting.collectAsState()
     var showApplyDialog by remember { mutableStateOf(false) }
 
     if (showApplyDialog) {
         ApplyLeaveDialog(
+            facultyList = facultyList,
             onDismiss = { showApplyDialog = false },
-            onApply = { start, end, reason ->
-                viewModel.submitLeaveRequest(start, end, reason)
+            onApply = { start, end, reason, facultyId, facultyName ->
+                viewModel.submitLeaveRequest(start, end, reason, facultyId, facultyName)
                 showApplyDialog = false
             },
             isSubmitting = isSubmitting
@@ -171,11 +173,14 @@ fun LeaveRequestItem(request: LeaveRequest) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ApplyLeaveDialog(
+    facultyList: List<Pair<String, String>>,
     onDismiss: () -> Unit,
-    onApply: (Long, Long, String) -> Unit,
+    onApply: (Long, Long, String, String, String) -> Unit,
     isSubmitting: Boolean
 ) {
     var reason by remember { mutableStateOf("") }
+    var selectedFaculty by remember { mutableStateOf<Pair<String, String>?>(null) }
+    var expanded by remember { mutableStateOf(false) }
     val dateRangePickerState = rememberDateRangePickerState()
 
     AlertDialog(
@@ -188,8 +193,37 @@ fun ApplyLeaveDialog(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Text("Select date range and reason for your absence.", style = MaterialTheme.typography.bodySmall)
+                Text("Select faculty, date range and reason for your absence.", style = MaterialTheme.typography.bodySmall)
                 
+                ExposedDropdownMenuBox(
+                    expanded = expanded,
+                    onExpandedChange = { expanded = !expanded }
+                ) {
+                    AcadMateTextField(
+                        value = selectedFaculty?.second ?: "",
+                        onValueChange = {},
+                        readOnly = true,
+                        label = "Forward to Faculty",
+                        placeholder = "Select Faculty",
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                        modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth()
+                    )
+                    ExposedDropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false }
+                    ) {
+                        facultyList.forEach { faculty ->
+                            DropdownMenuItem(
+                                text = { Text(faculty.second) },
+                                onClick = {
+                                    selectedFaculty = faculty
+                                    expanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+
                 DateRangePicker(
                     state = dateRangePickerState,
                     modifier = Modifier.height(400.dp),
@@ -214,9 +248,14 @@ fun ApplyLeaveDialog(
                 onClick = { 
                     val start = dateRangePickerState.selectedStartDateMillis ?: System.currentTimeMillis()
                     val end = dateRangePickerState.selectedEndDateMillis ?: start
-                    onApply(start, end, reason) 
+                    selectedFaculty?.let { 
+                        onApply(start, end, reason, it.first, it.second) 
+                    }
                 },
-                enabled = reason.isNotBlank() && dateRangePickerState.selectedStartDateMillis != null && !isSubmitting,
+                enabled = reason.isNotBlank() && 
+                          dateRangePickerState.selectedStartDateMillis != null && 
+                          selectedFaculty != null &&
+                          !isSubmitting,
                 loading = isSubmitting
             )
         },

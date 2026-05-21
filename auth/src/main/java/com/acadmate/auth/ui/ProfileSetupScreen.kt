@@ -15,15 +15,14 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -95,6 +94,7 @@ sealed class ProfileSetupUiState {
     data class Error(val message: String) : ProfileSetupUiState()
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileSetupScreen(
     phoneNumber: String,
@@ -110,10 +110,15 @@ fun ProfileSetupScreen(
     var password by remember { mutableStateOf("") }
     var enrollmentNumber by remember { mutableStateOf("") }
     var department by remember { mutableStateOf("") }
+    var section by remember { mutableStateOf("") }
     var selectedRole by remember { mutableStateOf(UserRole.STUDENT) }
     var selectedImageUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    
+    val departments by viewModel.departments.collectAsState()
+    val sections by viewModel.sections.collectAsState()
+    var deptExpanded by remember { mutableStateOf(false) }
+    var sectionExpanded by remember { mutableStateOf(false) }
 
-    val context = LocalContext.current
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
@@ -307,12 +312,69 @@ fun ProfileSetupScreen(
                         )
                     }
 
-                    AcadMateTextField(
-                        value = department,
-                        onValueChange = { department = it },
-                        label = "Department / Course",
-                        placeholder = "e.g. Computer Science"
-                    )
+                    // Department Dropdown
+                    ExposedDropdownMenuBox(
+                        expanded = deptExpanded,
+                        onExpandedChange = { deptExpanded = !deptExpanded }
+                    ) {
+                        AcadMateTextField(
+                            value = department,
+                            onValueChange = { department = it },
+                            label = "Department / Course",
+                            placeholder = "Select or type department",
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = deptExpanded) },
+                            modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryEditable).fillMaxWidth()
+                        )
+                        if (departments.isNotEmpty()) {
+                            ExposedDropdownMenu(
+                                expanded = deptExpanded,
+                                onDismissRequest = { deptExpanded = false }
+                            ) {
+                                departments.forEach { dept ->
+                                    DropdownMenuItem(
+                                        text = { Text(dept) },
+                                        onClick = {
+                                            department = dept
+                                            deptExpanded = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Section Dropdown
+                    if (selectedRole == UserRole.STUDENT) {
+                        ExposedDropdownMenuBox(
+                            expanded = sectionExpanded,
+                            onExpandedChange = { sectionExpanded = !sectionExpanded }
+                        ) {
+                            AcadMateTextField(
+                                value = section,
+                                onValueChange = { section = it },
+                                label = "Section",
+                                placeholder = "Select or type section",
+                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = sectionExpanded) },
+                                modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryEditable).fillMaxWidth()
+                            )
+                            if (sections.isNotEmpty()) {
+                                ExposedDropdownMenu(
+                                    expanded = sectionExpanded,
+                                    onDismissRequest = { sectionExpanded = false }
+                                ) {
+                                    sections.forEach { sec ->
+                                        DropdownMenuItem(
+                                            text = { Text(sec) },
+                                            onClick = {
+                                                section = sec
+                                                sectionExpanded = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
 
                     Spacer(modifier = Modifier.height(LocalSpacing.current.md))
 
@@ -336,6 +398,7 @@ fun ProfileSetupScreen(
                                 password = password,
                                 enrollmentNumber = enrollmentNumber,
                                 department = department,
+                                section = section,
                                 role = selectedRole,
                                 profilePictureUrl = uploadedUrl
                             )

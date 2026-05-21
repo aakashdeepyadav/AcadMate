@@ -33,6 +33,7 @@ class UserRepository @Inject constructor(
         phoneNumber: String,
         enrollmentNumber: String? = null,
         department: String? = null,
+        section: String? = null,
         role: String,
         profilePictureUrl: String? = null,
         address: String? = null
@@ -45,6 +46,7 @@ class UserRepository @Inject constructor(
                 phoneNumber = phoneNumber,
                 regNo = enrollmentNumber,
                 department = department,
+                section = section,
                 role = UserRole.fromString(role),
                 profilePictureUrl = profilePictureUrl,
                 address = address
@@ -61,6 +63,7 @@ class UserRepository @Inject constructor(
                 "phoneNumber" to phoneNumber,
                 "regNo" to enrollmentNumber,
                 "department" to department,
+                "section" to section,
                 "role" to role,
                 "profilePictureUrl" to profilePictureUrl,
                 "address" to address,
@@ -226,6 +229,7 @@ class UserRepository @Inject constructor(
                     phoneNumber = data?.get("phoneNumber") as? String ?: "",
                     regNo = data?.get("regNo") as? String ?: data?.get("enrollmentNumber") as? String,
                     department = data?.get("department") as? String,
+                    section = data?.get("section") as? String,
                     role = UserRole.fromString(data?.get("role") as? String),
                     profilePictureUrl = data?.get("profilePictureUrl") as? String,
                     address = data?.get("address") as? String,

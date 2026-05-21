@@ -11,6 +11,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -95,17 +97,22 @@ fun CreateUserScreen(
     }
 
     if (showAddDialog || editingUser != null) {
+        val departments by viewModel.departments.collectAsState()
+        val sections by viewModel.sections.collectAsState()
+        
         UserFormDialog(
             user = editingUser,
+            departments = departments,
+            sections = sections,
             onDismiss = { 
                 showAddDialog = false
                 editingUser = null
             },
-            onSave = { regNo, name, email, role, phone ->
+            onSave = { regNo, name, email, role, phone, dept, sec ->
                 if (editingUser != null) {
-                    viewModel.updateUser(editingUser!!.id, name, email, role, phone)
+                    viewModel.updateUser(editingUser!!.id, name, email, role, phone, dept, sec)
                 } else {
-                    viewModel.createInstitutionalUser(regNo, name, email, role, phone)
+                    viewModel.createInstitutionalUser(regNo, name, email, role, phone, dept, sec)
                 }
                 showAddDialog = false
                 editingUser = null
@@ -191,15 +198,22 @@ fun CreateUserScreen(
 @Composable
 fun UserFormDialog(
     user: UserEntity? = null,
+    departments: List<String> = emptyList(),
+    sections: List<String> = emptyList(),
     onDismiss: () -> Unit,
-    onSave: (String, String, String, UserRole, String) -> Unit
+    onSave: (String, String, String, UserRole, String, String, String) -> Unit
 ) {
     var selectedRole by remember { mutableStateOf(user?.role ?: UserRole.STUDENT) }
     var regNo by remember { mutableStateOf(user?.regNo ?: "") }
     var name by remember { mutableStateOf(user?.name ?: "") }
     var email by remember { mutableStateOf(user?.email ?: "") }
     var phoneNumber by remember { mutableStateOf(user?.phoneNumber ?: "") }
-    var expanded by remember { mutableStateOf(false) }
+    var department by remember { mutableStateOf(user?.department ?: "") }
+    var section by remember { mutableStateOf(user?.section ?: "") }
+    
+    var roleExpanded by remember { mutableStateOf(false) }
+    var deptExpanded by remember { mutableStateOf(false) }
+    var sectionExpanded by remember { mutableStateOf(false) }
 
     // Dynamic ID Length Constraint
     val expectedIdLength = when (selectedRole) {
@@ -212,52 +226,41 @@ fun UserFormDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (user == null) "Add New User" else "Edit User Info") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(LocalSpacing.current.md)) {
-                // 1. SELECT ROLE FIRST (Moved to top)
-                Box(modifier = Modifier.fillMaxWidth()) {
-                    ExposedDropdownMenuBox(
-                        expanded = expanded,
-                        onExpandedChange = { expanded = !expanded }
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(LocalSpacing.current.md)
+            ) {
+                // 1. SELECT ROLE
+                ExposedDropdownMenuBox(
+                    expanded = roleExpanded,
+                    onExpandedChange = { roleExpanded = !roleExpanded }
+                ) {
+                    AcadMateTextField(
+                        value = selectedRole.name,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = "User Role",
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = roleExpanded) },
+                        modifier = Modifier.menuAnchor().fillMaxWidth(),
+                        enabled = user == null
+                    )
+                    ExposedDropdownMenu(
+                        expanded = roleExpanded,
+                        onDismissRequest = { roleExpanded = false }
                     ) {
-                        AcadMateTextField(
-                            value = selectedRole.name,
-                            onValueChange = {},
-                            readOnly = true,
-                            label = "User Role",
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                            modifier = Modifier.menuAnchor().fillMaxWidth(),
-                            enabled = user == null // Don't allow changing role during edit
-                        )
-                        ExposedDropdownMenu(
-                            expanded = expanded,
-                            onDismissRequest = { expanded = false }
-                        ) {
-                            UserRole.values().forEach { role ->
-                                DropdownMenuItem(
-                                    text = { Text(role.name) },
-                                    onClick = {
-                                        selectedRole = role
-                                        expanded = false
-                                        // Auto-truncate or clear ID if role changes to a smaller requirement
-                                        if (regNo.length > when(role){
-                                            UserRole.ADMIN -> 4
-                                            UserRole.FACULTY -> 6
-                                            UserRole.STUDENT -> 8
-                                        }) {
-                                            regNo = regNo.take(when(role){
-                                                UserRole.ADMIN -> 4
-                                                UserRole.FACULTY -> 6
-                                                UserRole.STUDENT -> 8
-                                            })
-                                        }
-                                    }
-                                )
-                            }
+                        UserRole.values().forEach { role ->
+                            DropdownMenuItem(
+                                text = { Text(role.name) },
+                                onClick = {
+                                    selectedRole = role
+                                    roleExpanded = false
+                                }
+                            )
                         }
                     }
                 }
 
-                // 2. ID WITH DYNAMIC CONSTRAINT
+                // 2. ID
                 AcadMateTextField(
                     value = regNo,
                     onValueChange = { input ->
@@ -268,36 +271,76 @@ fun UserFormDialog(
                     label = "Enrollment / UID",
                     placeholder = "Enter $expectedIdLength digits",
                     modifier = Modifier.fillMaxWidth(),
-                    readOnly = user != null,
-                    supportingText = {
-                        Text(
-                            text = "Required: $expectedIdLength digits for ${selectedRole.name}",
-                            color = if (regNo.length == expectedIdLength) Color(0xFF10B981) 
-                                    else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    readOnly = user != null
                 )
 
-                AcadMateTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = "Full Name",
-                    modifier = Modifier.fillMaxWidth()
-                )
-                
-                AcadMateTextField(
-                    value = email,
-                    onValueChange = { email = it },
-                    label = "Email",
-                    placeholder = "user@university.edu",
-                    modifier = Modifier.fillMaxWidth()
-                )
+                AcadMateTextField(value = name, onValueChange = { name = it }, label = "Full Name", modifier = Modifier.fillMaxWidth())
+                AcadMateTextField(value = email, onValueChange = { email = it }, label = "Email", modifier = Modifier.fillMaxWidth())
+
+                // 3. DEPARTMENT DROPDOWN
+                ExposedDropdownMenuBox(
+                    expanded = deptExpanded,
+                    onExpandedChange = { deptExpanded = !deptExpanded }
+                ) {
+                    AcadMateTextField(
+                        value = department,
+                        onValueChange = { department = it },
+                        label = "Department",
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = deptExpanded) },
+                        modifier = Modifier.menuAnchor().fillMaxWidth()
+                    )
+                    if (departments.isNotEmpty()) {
+                        ExposedDropdownMenu(
+                            expanded = deptExpanded,
+                            onDismissRequest = { deptExpanded = false }
+                        ) {
+                            departments.forEach { dept ->
+                                DropdownMenuItem(
+                                    text = { Text(dept) },
+                                    onClick = {
+                                        department = dept
+                                        deptExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // 4. SECTION DROPDOWN
+                ExposedDropdownMenuBox(
+                    expanded = sectionExpanded,
+                    onExpandedChange = { sectionExpanded = !sectionExpanded }
+                ) {
+                    AcadMateTextField(
+                        value = section,
+                        onValueChange = { section = it },
+                        label = "Section",
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = sectionExpanded) },
+                        modifier = Modifier.menuAnchor().fillMaxWidth()
+                    )
+                    if (sections.isNotEmpty()) {
+                        ExposedDropdownMenu(
+                            expanded = sectionExpanded,
+                            onDismissRequest = { sectionExpanded = false }
+                        ) {
+                            sections.forEach { sec ->
+                                DropdownMenuItem(
+                                    text = { Text(sec) },
+                                    onClick = {
+                                        section = sec
+                                        sectionExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
 
                 AcadMateTextField(
                     value = phoneNumber,
                     onValueChange = { if (it.all { char -> char.isDigit() } && it.length <= 13) phoneNumber = it },
                     label = "Phone Number",
-                    placeholder = "10-digit mobile",
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone)
                 )
@@ -306,13 +349,11 @@ fun UserFormDialog(
         confirmButton = {
             AcadMateButton(
                 text = if (user == null) "Create" else "Save Changes",
-                onClick = { onSave(regNo, name, email, selectedRole, phoneNumber) },
+                onClick = { onSave(regNo, name, email, selectedRole, phoneNumber, department, section) },
                 enabled = regNo.length == expectedIdLength && name.isNotBlank() && email.isNotBlank()
             )
         },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
-        }
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
     )
 }
 

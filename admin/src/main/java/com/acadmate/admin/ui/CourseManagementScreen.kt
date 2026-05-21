@@ -56,6 +56,9 @@ class AdminCourseViewModel : ViewModel() {
     
     private val _facultyList = mutableStateListOf<String>()
     val facultyList: List<String> get() = _facultyList
+
+    private val _departments = mutableStateListOf<String>()
+    val departments: List<String> get() = _departments
     
     private val _isLoading = mutableStateOf(false)
     val isLoading: androidx.compose.runtime.State<Boolean> = _isLoading
@@ -64,6 +67,21 @@ class AdminCourseViewModel : ViewModel() {
         loadCourses()
         loadFaculty()
         loadSubjects()
+        loadInstitutionData()
+    }
+
+    private fun loadInstitutionData() {
+        viewModelScope.launch {
+            try {
+                val doc = firestore.collection("institution").document("config").get().await()
+                if (doc.exists()) {
+                    @Suppress("UNCHECKED_CAST")
+                    val depts = doc.get("departments") as? List<String> ?: emptyList()
+                    _departments.clear()
+                    _departments.addAll(depts)
+                }
+            } catch (e: Exception) {}
+        }
     }
 
     private fun loadSubjects() {
@@ -217,6 +235,7 @@ fun CourseManagementScreen(
 
     if (showSubjectDialog) {
         SubjectDialog(
+            departments = viewModel.departments,
             onDismiss = { showSubjectDialog = false },
             onSave = { name, code, dept ->
                 viewModel.addSubject(name, code, dept)
@@ -498,14 +517,17 @@ fun CourseDialog(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SubjectDialog(
+    departments: List<String> = emptyList(),
     onDismiss: () -> Unit,
     onSave: (String, String, String) -> Unit
 ) {
     var name by remember { mutableStateOf("") }
     var code by remember { mutableStateOf("") }
     var dept by remember { mutableStateOf("") }
+    var expanded by remember { mutableStateOf(false) }
 
     Dialog(onDismissRequest = onDismiss) {
         AcadMateCard(
@@ -518,7 +540,37 @@ fun SubjectDialog(
                 
                 AcadMateTextField(value = name, onValueChange = { name = it }, label = "Subject Name")
                 AcadMateTextField(value = code, onValueChange = { code = it }, label = "Subject Code")
-                AcadMateTextField(value = dept, onValueChange = { dept = it }, label = "Department")
+                
+                // Department Dropdown
+                ExposedDropdownMenuBox(
+                    expanded = expanded,
+                    onExpandedChange = { expanded = !expanded }
+                ) {
+                    AcadMateTextField(
+                        value = dept,
+                        onValueChange = { dept = it },
+                        label = "Department",
+                        placeholder = "Select or type department",
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                        modifier = Modifier.menuAnchor().fillMaxWidth()
+                    )
+                    if (departments.isNotEmpty()) {
+                        ExposedDropdownMenu(
+                            expanded = expanded,
+                            onDismissRequest = { expanded = false }
+                        ) {
+                            departments.forEach { d ->
+                                DropdownMenuItem(
+                                    text = { Text(d) },
+                                    onClick = {
+                                        dept = d
+                                        expanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     TextButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("Cancel") }

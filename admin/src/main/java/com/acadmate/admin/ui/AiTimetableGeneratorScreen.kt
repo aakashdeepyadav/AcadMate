@@ -158,6 +158,10 @@ class AiTimetableViewModel @Inject constructor(
                 val subjectRules = _constraints.value.joinToString("\n") { 
                     "- ${it.subject.name} (${it.subject.code}): ${it.classesPerWeek} classes per week" 
                 }
+                
+                val facultyInfo = _allCourses.value.joinToString("\n") { 
+                    "- Subject: ${it.name} -> Faculty: ${it.assignedFaculty ?: "TBA"}"
+                }
 
                 val prompt = """
                     You are an expert academic scheduler. Generate a JSON timetable for a 5-day week (Monday to Friday, dayIndex 1 to 5).
@@ -168,6 +172,9 @@ class AiTimetableViewModel @Inject constructor(
                     - Subject Requirements:
                     $subjectRules
                     
+                    Faculty Assignments (DO NOT use "TBA" if faculty is listed here):
+                    $facultyInfo
+                    
                     ${if (availableRooms.isNotBlank()) "Available Rooms to use: $availableRooms" else "Use realistic room numbers like B-101, Lab-2, etc."}
                     
                     Additional Instructions/Preferences:
@@ -177,8 +184,9 @@ class AiTimetableViewModel @Inject constructor(
                     1. Classes must be between 45 to 60 minutes long.
                     2. No subject should have more than 2 classes in a single day.
                     3. Ensure no overlaps between slots.
-                    4. Return ONLY a valid JSON object in this format: {"schedule": [{"dayIndex": 1, "subject": "Subject Name", "startTime": "HH:mm", "endTime": "HH:mm", "room": "Room No"}]}
+                    4. Return ONLY a valid JSON object in this format: {"schedule": [{"dayIndex": 1, "subject": "Subject Name", "startTime": "HH:mm", "endTime": "HH:mm", "room": "Room No", "faculty": "Faculty Name"}]}
                     5. Use ONLY the provided Available Rooms if specified.
+                    6. Assign the correct faculty to each subject based on the 'Faculty Assignments' list provided above.
                 """.trimIndent()
 
                 val result = generativeModel.generateContent(prompt)
@@ -186,16 +194,26 @@ class AiTimetableViewModel @Inject constructor(
                 
                 val aiResponse = json.decodeFromString<AiTimetableResponse>(responseText)
                 val entities = aiResponse.schedule.map { item: AiTimetableSlot ->
-                    // Auto-assign faculty if defined in courses
-                    val assignedFaculty = _allCourses.value.find { 
-                        it.name.equals(item.subject, ignoreCase = true) || it.code.equals(item.subject, ignoreCase = true)
-                    }?.assignedFaculty ?: ""
+                    // Priority 1: Use faculty assigned by AI (if valid)
+                    // Priority 2: Auto-assign from course mapping
+                    // Priority 3: Leave blank
+                    
+                    val courseMappingFaculty = _allCourses.value.find { 
+                        it.name.equals(item.subject, ignoreCase = true) || it.code.equals(item.subject, ignoreCase = true) ||
+                        item.subject.contains(it.name, ignoreCase = true)
+                    }?.assignedFaculty
+
+                    val finalFaculty = when {
+                        !item.faculty.isNullOrBlank() && item.faculty != "TBA" -> item.faculty
+                        !courseMappingFaculty.isNullOrBlank() -> courseMappingFaculty
+                        else -> ""
+                    }
 
                     TimetableEntity(
                         id = "AI_${java.util.UUID.randomUUID()}",
                         dayOfWeek = item.dayIndex,
                         subject = item.subject,
-                        faculty = assignedFaculty,
+                        faculty = finalFaculty,
                         startTime = item.startTime,
                         endTime = item.endTime,
                         room = item.room,

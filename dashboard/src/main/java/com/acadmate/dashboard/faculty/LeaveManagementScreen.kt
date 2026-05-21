@@ -42,7 +42,9 @@ fun LeaveManagementScreen(
         scope.launch {
             isLoading = true
             try {
+                val facultyId = FirebaseAuth.getInstance().currentUser?.uid ?: return@launch
                 val snapshot = firestore.collection("leave_requests")
+                    .whereEqualTo("facultyId", facultyId)
                     .whereEqualTo("status", LeaveStatus.PENDING.name)
                     .get()
                     .await()

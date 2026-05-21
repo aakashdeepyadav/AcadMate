@@ -29,9 +29,70 @@ class AdminViewModel @Inject constructor(
     private val _usersList = MutableStateFlow<List<UserEntity>>(emptyList())
     val usersList: StateFlow<List<UserEntity>> = _usersList
 
+    private val _departments = MutableStateFlow<List<String>>(emptyList())
+    val departments: StateFlow<List<String>> = _departments
+
+    private val _sections = MutableStateFlow<List<String>>(emptyList())
+    val sections: StateFlow<List<String>> = _sections
+
     init {
         loadAdminDashboard()
         loadUsers()
+        loadInstitutionData()
+    }
+
+    private fun loadInstitutionData() {
+        viewModelScope.launch {
+            try {
+                val doc = firestore.collection("institution").document("config").get().await()
+                if (doc.exists()) {
+                    @Suppress("UNCHECKED_CAST")
+                    _departments.value = doc.get("departments") as? List<String> ?: emptyList()
+                    @Suppress("UNCHECKED_CAST")
+                    _sections.value = doc.get("sections") as? List<String> ?: emptyList()
+                }
+            } catch (e: Exception) {}
+        }
+    }
+
+    fun addDepartment(name: String) {
+        viewModelScope.launch {
+            val newList = _departments.value + name
+            firestore.collection("institution").document("config")
+                .update("departments", newList).await()
+            _departments.value = newList
+            logAdminAction("Department Added", ActionType.INSTITUTION_UPDATED, "New department: $name")
+        }
+    }
+
+    fun deleteDepartment(name: String) {
+        viewModelScope.launch {
+            val newList = _departments.value - name
+            firestore.collection("institution").document("config")
+                .update("departments", newList).await()
+            _departments.value = newList
+            logAdminAction("Department Removed", ActionType.INSTITUTION_UPDATED, "Removed department: $name")
+        }
+    }
+
+    fun addSection(name: String) {
+        viewModelScope.launch {
+            val newList = _sections.value + name
+            firestore.collection("institution").document("config")
+                .update("sections", newList).await()
+            _sections.value = newList
+            logAdminAction("Section Added", ActionType.INSTITUTION_UPDATED, "New section: $name")
+        }
+    }
+
+    fun deleteSection(name: String) {
+        viewModelScope.launch {
+            val newList = _sections.value - name
+            firestore.collection("institution").document("config")
+                .update("sections", newList).await()
+            _sections.value = newList
+            logAdminAction("Section Removed", ActionType.INSTITUTION_UPDATED, "Removed section: $name")
+        }
     }
 
     fun loadUsers() {
@@ -47,6 +108,7 @@ class AdminViewModel @Inject constructor(
                         regNo = doc.getString("regNo"),
                         role = UserRole.fromString(doc.getString("role")),
                         department = doc.getString("department"),
+                        section = doc.getString("section"),
                         isFirstLogin = doc.getBoolean("isFirstLogin") ?: true
                     )
                 }
@@ -230,7 +292,9 @@ class AdminViewModel @Inject constructor(
         name: String,
         email: String,
         role: UserRole,
-        phoneNumber: String
+        phoneNumber: String,
+        department: String? = null,
+        section: String? = null
     ) {
         if (!ValidationUtils.isValidRegistrationNumber(regNo, role)) {
             _uiState.value = AdminUiState.Error(ValidationUtils.getRegistrationNumberErrorMessage(role))
@@ -260,6 +324,8 @@ class AdminViewModel @Inject constructor(
                     "role" to role.name,
                     "phoneNumber" to formattedPhone,
                     "password" to "Password@123", // Default institutional password
+                    "department" to department,
+                    "section" to section,
                     "isFirstLogin" to true,
                     "createdAt" to System.currentTimeMillis(),
                     "updatedAt" to System.currentTimeMillis()
@@ -283,15 +349,19 @@ class AdminViewModel @Inject constructor(
         name: String,
         email: String,
         role: UserRole,
-        phoneNumber: String
+        phoneNumber: String,
+        department: String? = null,
+        section: String? = null
     ) {
         viewModelScope.launch {
             try {
-                val userData = hashMapOf<String, Any>(
+                val userData = hashMapOf<String, Any?>(
                     "name" to name,
                     "email" to email,
                     "role" to role.name,
                     "phoneNumber" to phoneNumber,
+                    "department" to department,
+                    "section" to section,
                     "updatedAt" to System.currentTimeMillis()
                 )
                 

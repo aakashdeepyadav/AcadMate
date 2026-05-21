@@ -23,11 +23,29 @@ class LeaveViewModel @Inject constructor() : ViewModel() {
     private val _leaveRequests = MutableStateFlow<List<LeaveRequest>>(emptyList())
     val leaveRequests: StateFlow<List<LeaveRequest>> = _leaveRequests
 
+    private val _facultyList = MutableStateFlow<List<Pair<String, String>>>(emptyList())
+    val facultyList: StateFlow<List<Pair<String, String>>> = _facultyList
+
     private val _isSubmitting = MutableStateFlow(false)
     val isSubmitting: StateFlow<Boolean> = _isSubmitting
 
     init {
         loadMyRequests()
+        loadFacultyList()
+    }
+
+    private fun loadFacultyList() {
+        viewModelScope.launch {
+            try {
+                val snapshot = firestore.collection("users")
+                    .whereEqualTo("role", "FACULTY")
+                    .get()
+                    .await()
+                _facultyList.value = snapshot.documents.map { 
+                    it.id to (it.getString("name") ?: "Unknown Faculty")
+                }
+            } catch (e: Exception) { }
+        }
     }
 
     fun loadMyRequests() {
@@ -44,7 +62,7 @@ class LeaveViewModel @Inject constructor() : ViewModel() {
         }
     }
 
-    fun submitLeaveRequest(startDate: Long, endDate: Long, reason: String) {
+    fun submitLeaveRequest(startDate: Long, endDate: Long, reason: String, facultyId: String, facultyName: String) {
         val userId = auth.currentUser?.uid ?: return
         val userName = auth.currentUser?.displayName ?: "Student"
         
@@ -55,6 +73,8 @@ class LeaveViewModel @Inject constructor() : ViewModel() {
                     id = UUID.randomUUID().toString(),
                     studentId = userId,
                     studentName = userName,
+                    facultyId = facultyId,
+                    facultyName = facultyName,
                     startDate = startDate,
                     endDate = endDate,
                     reason = reason,
