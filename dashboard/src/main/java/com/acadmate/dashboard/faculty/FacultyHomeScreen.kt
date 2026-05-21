@@ -23,6 +23,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -238,6 +239,7 @@ fun QuickActionGrid(
         FacultyAction("Take Attendance", Icons.AutoMirrored.Filled.FactCheck, Color(0xFF4F46E5), "Mark Attendance"),
         FacultyAction("Assignments", Icons.AutoMirrored.Filled.Assignment, Color(0xFFF59E0B), "Post Assignment"),
         FacultyAction("Materials", Icons.AutoMirrored.Filled.LibraryBooks, Color(0xFF10B981), "Materials"),
+        FacultyAction("Gradebook", Icons.Default.Grade, Color(0xFF8B5CF6), "Gradebook"),
         FacultyAction("Leave Mgmt", Icons.AutoMirrored.Filled.EventNote, Color(0xFFEC4899), "Leave Management"),
         FacultyAction("Timetable", Icons.Default.CalendarMonth, Color(0xFFE17055), "Timetable"),
         FacultyAction("Announce", Icons.Default.Campaign, Color(0xFF6C5CE7), "Notice Board"),
@@ -296,27 +298,17 @@ fun FacultyAiTools(onActionClick: (String, String?) -> Unit) {
                 icon = Icons.Default.AutoStories,
                 color = Color(0xFFEEF2FF),
                 tint = Color(0xFF4F46E5),
-                onClick = { onActionClick("AI Tutor", null) }
+                onClick = { onActionClick("Lesson Planner", null) }
             )
         }
         item {
             AiFeatureCard(
-                title = "Auto-Grader",
-                subtitle = "AI Insights",
-                icon = Icons.Default.Quiz,
-                color = Color(0xFFECFDF5),
-                tint = Color(0xFF059669),
-                onClick = { onActionClick("Gradebook", null) }
-            )
-        }
-        item {
-            AiFeatureCard(
-                title = "Exam Generator",
+                title = "Quiz Generator",
                 subtitle = "Smart MCQ",
                 icon = Icons.Default.EditNote,
                 color = Color(0xFFFFF7ED),
                 tint = Color(0xFFD97706),
-                onClick = { onActionClick("AI Tutor", null) }
+                onClick = { onActionClick("Quiz Generator", null) }
             )
         }
     }
@@ -436,69 +428,106 @@ fun LiveClassControlCard(
 
     AcadMateCard(
         variant = CardVariant.Gradient,
-        gradientColors = listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary),
+        gradientColors = listOf(Color(0xFF4F46E5), Color(0xFF9333EA)),
+        cornerRadius = 28.dp,
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(LocalSpacing.current.md)) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Surface(
-                    modifier = Modifier
-                        .size(12.dp)
-                        .graphicsLayer(alpha = pulseAlpha),
-                    color = Color(0xFF34D399),
-                    shape = CircleShape
-                ) {}
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    "Current Session: ${liveClass.id}",
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
-                    color = Color.White
-                )
-            }
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            Text(
-                "You are scheduled to teach ${liveClass.title} in ${liveClass.room}.",
-                style = MaterialTheme.typography.bodySmall,
-                color = Color.White.copy(alpha = 0.8f)
+        Box(modifier = Modifier.fillMaxWidth()) {
+            Icon(
+                imageVector = Icons.Default.Podcasts,
+                contentDescription = null,
+                modifier = Modifier
+                    .size(150.dp)
+                    .align(Alignment.BottomEnd)
+                    .offset(x = 40.dp, y = 40.dp)
+                    .alpha(0.1f),
+                tint = Color.White
             )
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            Row(horizontalArrangement = Arrangement.spacedBy(LocalSpacing.current.sm)) {
-                Button(
-                    onClick = { onActionClick("Mark Attendance", liveClass.id) },
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = MaterialTheme.colorScheme.primary),
-                    shape = RoundedCornerShape(12.dp)
+
+            Column(modifier = Modifier.padding(24.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Icon(Icons.Default.Podcasts, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Start Beacon", fontWeight = FontWeight.Bold)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
+                            modifier = Modifier
+                                .size(12.dp)
+                                .graphicsLayer(alpha = pulseAlpha),
+                            color = Color(0xFF34D399),
+                            shape = CircleShape
+                        ) {}
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            "LIVE SESSION",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp),
+                            color = Color.White.copy(alpha = 0.8f)
+                        )
+                    }
+                    
+                    Surface(
+                        color = Color.White.copy(alpha = 0.2f),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text(
+                            text = liveClass.room,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
                 
-                OutlinedButton(
-                    onClick = { onClassClick(liveClass.id, null) },
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.5f)),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text("Live List")
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                Text(
+                    text = liveClass.title,
+                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Black),
+                    color = Color.White
+                )
+                
+                Text(
+                    text = "ID: ${liveClass.id} • ${liveClass.time}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.7f)
+                )
+                
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Button(
+                        onClick = { onActionClick("Mark Attendance", liveClass.id) },
+                        modifier = Modifier.weight(1.2f).height(50.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color(0xFF4F46E5)),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Icon(Icons.Default.Podcasts, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("START BEACON", fontWeight = FontWeight.Black, fontSize = 13.sp)
+                    }
+                    
+                    OutlinedButton(
+                        onClick = { onClassClick(liveClass.id, null) },
+                        modifier = Modifier.weight(0.8f).height(50.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                        border = BorderStroke(1.5.dp, Color.White.copy(alpha = 0.4f)),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Text("STUDENTS", fontWeight = FontWeight.Bold)
+                    }
                 }
+                
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    "Broadcasts secure ultrasonic signal to prevent proxy attendance.",
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                    color = Color.White.copy(alpha = 0.5f),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                "Students have 10 minutes to mark themselves present once you start.",
-                style = MaterialTheme.typography.labelSmall,
-                color = Color.White.copy(alpha = 0.6f),
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
-            )
         }
     }
 }

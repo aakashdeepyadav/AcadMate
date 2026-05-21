@@ -37,7 +37,7 @@ fun ResultScreen(
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("Exam Finished!", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        Text("Quiz Finished!", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         
         Spacer(modifier = Modifier.height(32.dp))
 

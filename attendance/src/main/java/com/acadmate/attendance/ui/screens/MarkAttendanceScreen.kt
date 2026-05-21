@@ -94,6 +94,17 @@ import androidx.fragment.app.FragmentActivity
 import javax.inject.Inject
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.acadmate.attendance.geo.AttendanceForegroundService
+import androidx.compose.foundation.border
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.draw.shadow
+import com.acadmate.designsystem.components.AcadMateTextField
+import androidx.compose.material3.TextButton
 
 @Composable
 fun MarkAttendanceScreen(
@@ -142,6 +153,10 @@ fun MarkAttendanceScreen(
         when (uiState) {
             AttendanceUiState.Loading -> currentStep = 1
             AttendanceUiState.VerifyingAcoustic -> {
+                currentStep = 1
+                haptic.success()
+            }
+            AttendanceUiState.ScanningQr -> {
                 currentStep = 1
                 haptic.success()
             }
@@ -217,6 +232,15 @@ fun MarkAttendanceScreen(
 
                         AttendanceUiState.VerifyingAcoustic -> {
                             StepAcousticVerification(viewModel)
+                        }
+
+                        AttendanceUiState.ScanningQr -> {
+                            StepQrScanning(
+                                onTokenScanned = { token ->
+                                    viewModel.verifyQrToken(token, subject, faculty, context)
+                                },
+                                onCancel = { viewModel.reset() }
+                            )
                         }
 
                         AttendanceUiState.VerifyingIdentity -> {
@@ -680,6 +704,83 @@ fun ErrorScreen(reason: String, onRetry: () -> Unit) {
             variant = ButtonVariant.Danger,
             modifier = Modifier.fillMaxWidth()
         )
+    }
+}
+
+@Composable
+fun StepQrScanning(
+    onTokenScanned: (String) -> Unit,
+    onCancel: () -> Unit
+) {
+    var scannedToken by remember { mutableStateOf("") }
+    
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(Icons.Default.QrCodeScanner, null, modifier = Modifier.size(100.dp), tint = MaterialTheme.colorScheme.primary)
+        
+        Spacer(modifier = Modifier.height(24.dp))
+        
+        Text("Beacon Signal Not Found", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
+        Text("Please scan the Dynamic QR displayed by your professor", style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center)
+        
+        Spacer(modifier = Modifier.height(32.dp))
+        
+        // Stylized Scanner Frame
+        Box(
+            modifier = Modifier
+                .size(200.dp)
+                .border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(16.dp))
+                .padding(8.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            // Simulated Scanning Animation
+            val infiniteTransition = rememberInfiniteTransition(label = "scanLine")
+            val yOffset by infiniteTransition.animateFloat(
+                initialValue = 0f,
+                targetValue = 180f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(2000, easing = LinearEasing),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "y"
+            )
+            
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(2.dp)
+                    .offset(y = yOffset.dp - 90.dp)
+                    .background(MaterialTheme.colorScheme.primary)
+                    .shadow(4.dp)
+            )
+            
+            Text("Scanning...", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
+        
+        AcadMateTextField(
+            value = scannedToken,
+            onValueChange = { scannedToken = it },
+            label = "Enter QR Token Manually",
+            placeholder = "QR_...",
+            modifier = Modifier.fillMaxWidth()
+        )
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        AcadMateButton(
+            text = "Verify Token",
+            onClick = { onTokenScanned(scannedToken) },
+            enabled = scannedToken.startsWith("QR_")
+        )
+        
+        TextButton(onClick = onCancel) {
+            Text("Cancel")
+        }
     }
 }
 

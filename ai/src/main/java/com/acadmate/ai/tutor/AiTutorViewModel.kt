@@ -40,28 +40,93 @@ class AiTutorViewModel @Inject constructor(
     private val _realSyllabus = MutableStateFlow<List<com.acadmate.core.model.SubjectSyllabus>>(emptyList())
     val realSyllabus: StateFlow<List<com.acadmate.core.model.SubjectSyllabus>> = _realSyllabus.asStateFlow()
 
+    private val _sessions = MutableStateFlow<List<ChatSession>>(emptyList())
+    val sessions: StateFlow<List<ChatSession>> = _sessions.asStateFlow()
+
+    private val _currentSession = MutableStateFlow<ChatSession?>(null)
+    val currentSession: StateFlow<ChatSession?> = _currentSession.asStateFlow()
+
     private var currentSessionId: String = UUID.randomUUID().toString()
 
     init {
         loadRealSyllabus()
+        loadSessions()
+    }
+
+    private fun loadSessions() {
+        viewModelScope.launch {
+            chatDao.getAllSessions().collect {
+                _sessions.value = it
+            }
+        }
     }
 
     private fun loadRealSyllabus() {
         viewModelScope.launch {
             try {
-                val snapshot = firestore.collection("syllabuses").get().await()
-                _realSyllabus.value = snapshot.toObjects(com.acadmate.core.model.SubjectSyllabus::class.java)
-            } catch (e: Exception) {}
+                val userId = auth.currentUser?.uid ?: return@launch
+                // First try to get subjects assigned to this student specifically
+                val studentDoc = firestore.collection("users").document(userId).get().await()
+                val department = studentDoc.getString("department")
+                
+                val snapshot = if (department != null) {
+                    firestore.collection("syllabuses")
+                        .whereEqualTo("department", department)
+                        .get()
+                        .await()
+                } else {
+                    firestore.collection("syllabuses").get().await()
+                }
+                
+                val list = snapshot.toObjects(com.acadmate.core.model.SubjectSyllabus::class.java)
+                if (list.isNotEmpty()) {
+                    _realSyllabus.value = list
+                } else {
+                    _realSyllabus.value = com.acadmate.core.model.PredefinedSyllabus.bTechCse6thSem
+                }
+            } catch (e: Exception) {
+                _realSyllabus.value = com.acadmate.core.model.PredefinedSyllabus.bTechCse6thSem
+            }
         }
     }
 
     fun setMode(mode: String) {
         _currentMode.value = mode
+        // If we don't have a session for this mode, we might want to create one or load the latest
+        viewModelScope.launch {
+            val latestForMode = _sessions.value.firstOrNull { it.mode == mode }
+            if (latestForMode != null) {
+                loadConversationHistory(latestForMode.id)
+            } else {
+                createNewSession(mode)
+            }
+        }
+    }
+
+    fun createNewSession(mode: String, subject: String? = null, unit: String? = null) {
+        val newSession = ChatSession(
+            title = if (subject != null) "Study: $subject" else "New $mode Session",
+            mode = mode,
+            subject = subject,
+            unit = unit
+        )
+        viewModelScope.launch {
+            chatDao.insertSession(newSession)
+            _currentSession.value = newSession
+            currentSessionId = newSession.id
+            _messages.value = emptyList()
+        }
     }
 
     fun loadConversationHistory(sessionId: String) {
         currentSessionId = sessionId
         viewModelScope.launch {
+            val session = chatDao.getSessionById(sessionId)
+            _currentSession.value = session
+            if (session != null) {
+                _currentMode.value = session.mode
+            }
+
             chatDao.getMessagesBySession(sessionId).collect {
                 _messages.value = it
             }
@@ -146,6 +211,24 @@ class AiTutorViewModel @Inject constructor(
     fun sendMessage(text: String, subject: String?, unit: String? = null) {
         if (text.isBlank()) return
 
+        // Update current session metadata if needed
+        val currentSess = _currentSession.value
+        if (currentSess != null) {
+            viewModelScope.launch {
+                val updatedSession = currentSess.copy(
+                    lastUpdated = System.currentTimeMillis(),
+                    subject = subject ?: currentSess.subject,
+                    unit = unit ?: currentSess.unit,
+                    title = if (currentSess.title.startsWith("New")) text.take(20) + "..." else currentSess.title
+                )
+                chatDao.insertSession(updatedSession)
+                _currentSession.value = updatedSession
+            }
+        } else {
+            // Create session if it doesn't exist
+            createNewSession(_currentMode.value, subject, unit)
+        }
+
         val userMessage = ChatMessage(
             sessionId = currentSessionId,
             text = text,
@@ -190,18 +273,17 @@ class AiTutorViewModel @Inject constructor(
                 """.trimIndent()
 
                 val interviewPrompt = """
-                    You are AcadMate Technical Interviewer. You are an expert engineer from a Top Tier tech company (like Google or Microsoft).
-                    Your goal is to prepare the student for high-stakes technical interviews.
-                    Focus on:
-                    1. Data Structures & Algorithms (DSA)
-                    2. System Design and Scalability
-                    3. Core CS fundamentals (OS, DBMS, Networking)
-                    4. Mock Behavioral questions (STAR method)
+                    You are AcadMate Technical Interviewer, an elite lead engineer from a Top Tier Big-Tech company (MAANG level).
+                    Your goal is to prepare the student for high-stakes modern technical interviews and placements.
                     
-                    When the student asks a question, explain the "Optimal" solution and common pitfalls.
-                    Institutional Syllabus for Reference:
-                    $dynamicSyllabusContext
+                    CRITICAL: Do NOT focus on college syllabus or academic theory unless specifically asked. Focus on industry-standard skills:
+                    1. Data Structures & Algorithms (LeetCode style, optimization, complexity)
+                    2. System Design (Scalability, Load Balancing, Microservices, Databases)
+                    3. Core CS Engineering: OS (Concurrency, Memory), DBMS (Indexing, Transactions), Computer Networks (TCP/IP, HTTP/S)
+                    4. Modern Tech Stacks: Android (Jetpack Compose, MVVM), Frontend (React/Next.js), Backend (Spring Boot, Node.js, Go)
+                    5. Behavioral: Leadership Principles, STAR method, Soft Skills for placements.
                     
+                    When the student mentions a role or company, tailor your mock interview to that specific company's bar.
                     Student Context: $studentContext
                 """.trimIndent()
 
@@ -216,9 +298,27 @@ class AiTutorViewModel @Inject constructor(
                     When asked for a plan, provide a day-by-day or topic-by-topic schedule that focuses on bridging their "Syllabus Gaps" first.
                 """.trimIndent()
 
+                val facultyPlannerPrompt = """
+                    You are AcadMate Lesson Architect, a specialized AI consultant for University Professors.
+                    Your goal is to help a Professor create a comprehensive, engaging, and time-optimized Lesson Plan for their specific syllabus.
+                    
+                    Institutional Syllabus Context:
+                    $dynamicSyllabusContext
+
+                    When a professor asks for a lesson plan or lecture draft:
+                    1.  **Learning Objectives**: Define what students should know by the end of the session.
+                    2.  **Lecture Breakdown**: Provide a minute-by-minute or topic-by-topic flow.
+                    3.  **Active Learning**: Suggest 1-2 interactive activities or demos.
+                    4.  **Assessment**: Provide 2-3 formative questions to check student understanding.
+                    5.  **Modern Insights**: Link concepts to current industry trends (e.g., if teaching OS, mention Kubernetes).
+
+                    Always be professional, concise, and academically rigorous.
+                """.trimIndent()
+
+                val currentRole = onboardingDataStore.selectedRole.first()
                 val systemPrompt = when(_currentMode.value) {
                     "INTERVIEW" -> interviewPrompt
-                    "PLANNER" -> plannerPrompt
+                    "PLANNER" -> if (currentRole == UserRole.FACULTY) facultyPlannerPrompt else plannerPrompt
                     else -> tutorPrompt
                 }
 

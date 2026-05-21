@@ -4,7 +4,15 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.acadmate.core.model.UserRole
 
-@Entity(tableName = "users")
+import androidx.room.Index
+
+@Entity(
+    tableName = "users",
+    indices = [
+        Index(value = ["email"], unique = true),
+        Index(value = ["regNo"], unique = true)
+    ]
+)
 data class UserEntity(
     @PrimaryKey
     val id: String,

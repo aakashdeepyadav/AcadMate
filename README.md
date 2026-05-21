@@ -1,11 +1,11 @@
-# AcadMate: The Elite Academic Operating System
+# <img src="app/src/main/res/drawable/acadmate.png" width="48" valign="middle"> AcadMate: The Elite Academic Operating System
 
 [![Platform](https://img.shields.io/badge/Platform-Android-green.svg)](https://developer.android.com/android)
 [![Architecture](https://img.shields.io/badge/Architecture-Clean%20%2B%20Modular-blue.svg)](https://developer.android.com/topic/architecture)
 [![Backend](https://img.shields.io/badge/Backend-Firebase-orange.svg)](https://firebase.google.com/)
-[![Security](https://img.shields.io/badge/Security-5--Layer%20Anti--Proxy-red.svg)]()
+[![Security](https://img.shields.io/badge/Security-6--Layer%20Anti--Proxy-red.svg)]()
 
-AcadMate is an enterprise-grade academic management ecosystem designed to eliminate institutional friction. It integrates a **proprietary 5-layer anti-proxy attendance protocol** with a **context-aware AI Learning Suite**, providing a unified, production-ready infrastructure for Administrators, Faculty, and Students. 
+AcadMate Elite is an enterprise-grade academic management ecosystem designed to eliminate institutional friction. It integrates a **proprietary 6-layer anti-proxy attendance protocol** with a **context-aware AI Learning Suite**, providing a unified, production-ready infrastructure for Administrators, Faculty, and Students. 
 
 This multi-module Android application handles the end-to-end lifecycle of a higher education institution, from deep curriculum building to automated grading, all driven by a real-time Firestore backend.
 
@@ -14,18 +14,19 @@ This multi-module Android application handles the end-to-end lifecycle of a high
 ## 📱 Download Latest APK
 You can download the latest production-ready APK from the link below:
 
-[**⬇️ Download AcadMate v1.2.0-Elite**](https://github.com/aakashdeepyadav/AcadMate/releases/download/v1.1.0/AcadMate-v1.1.0.apk)
+[**⬇️ Download AcadMate v1.2.0-Elite**](https://github.com/aakashdeepyadav/AcadMate/releases/download/v1.2.0/AcadMate-v1.2.0.apk)
 
 ---
 
-## 🔐 The 5-Layer Anti-Proxy Protocol
-AcadMate solves the "Proxy Problem" in Indian colleges through a mandatory 5-layer verification stack that makes marking attendance for a friend statistically and practically impossible.
+## 🔐 The 6-Layer Anti-Proxy Protocol
+AcadMate Elite solves the "Proxy Problem" in institutional settings through a mandatory 6-layer verification stack that makes marking attendance for a friend statistically and practically impossible.
 
 1.  **Hardware-Level Binding (Layer 1)**: Each account is cryptographically locked to a single `ANDROID_ID`. "Phone passing" is impossible without Admin approval.
-2.  **Acoustic Proximity (Layer 2)**: Uses **continuous infinite-looping** near-ultrasonic handshakes (18.5kHz) to prove the device is physically located within the classroom.
+2.  **Acouximity (Layer 2)**: Uses **continuous infinite-looping** near-ultrasonic handshakes (18.5kHz) to prove the device is physically located within the classroom.
 3.  **ML Face Liveness (Layer 3)**: Uses Google ML Kit to detect natural blinks and micro-movements. **Mandatory Profile Photo** enrollment ensures biometric integrity.
 4.  **Campus Geofencing (Layer 4)**: High-precision GPS validation with real-time distance feedback (e.g., "Off-campus: 120m away") ensures the user is within institutional boundaries.
 5.  **Continuous Presence Monitoring (Layer 5)**: A foreground service maintains a secure connection and location heartbeats throughout the lecture duration.
+6.  **App Integrity (Layer 6)**: Integration with **Google Play Integrity API** ensures that only un-tampered, genuine app instances can communicate with the backend.
 
 ---
 
@@ -35,7 +36,7 @@ AcadMate adapts its entire interface and permission set based on the institution
 
 ### 1. Institutional Administrator (The Command Center)
 The Admin portal is designed for high-level oversight and system integrity.
-*   **User Governance**: Full CRUD lifecycle management including **Edit User Info** capabilities. Admins create profiles (Students, Faculty) and assign dynamic roles.
+*   **User Governance**: Full CRUD lifecycle management including **Edit User Info** capabilities. Admins create profiles (Students, Faculty) and manage roles.
 *   **Centralized Syllabus Management**: Define the master curriculum with multi-unit structures and specific topics. Changes propagate instantly to all roles.
 *   **Smart AI Scheduler**: Generate optimized timetables using **Gemini AI** with support for **Natural Language Suggestions** (e.g., "No labs on Monday") and **Room Inventory** management.
 *   **Institutional Pulse**: A real-time dashboard displaying campus-wide active sessions, **actual average attendance**, and pending security anomalies.
@@ -49,10 +50,17 @@ A suite of tools designed to reduce administrative load and maximize teaching ti
 
 ### 3. Student (The Intelligent Learner)
 A personal companion that handles the "mechanics" of college life, allowing the student to focus on learning.
-*   **Smart Auto-Alarm**: Automatically schedules a high-priority system alarm **1 hour before the first class** of the day.
+*   **Smart Auto-Alarm**: Automatically schedules a high-priority system alarm **dynamic minutes before the first class** of the day.
 *   **Alarm Customization**: Students can modify alarm volume, vibration, and tones within the Manage Notifications suite.
 *   **Academic Hub**: Instant access to real-time Timetables, Assignments, **Syllabus Progress**, and Campus Notices.
-*   **Luminous Scholar Aesthetic**: Deep-indigo premium interface featuring a visual Attendance Hero and interactive GPA Simulator.
+*   **Elite Scholar Aesthetic**: Deep-indigo premium interface featuring a visual Attendance Hero and interactive GPA Simulator.
+
+---
+
+## 🛰️ High-Performance Features
+*   **Room DB Offline Engine**: Instant access to Timetables, Assignments, Syllabuses, and Results even without internet connectivity.
+*   **Secure Biometric Unlock**: Protect sensitive academic data with Android Biometric (Face/Fingerprint) integration.
+*   **Intelligent AI Suite**: Includes a Tech Interview Prep mode, Study Planner, and AI Summarizer for lecture audio.
 
 ---
 
@@ -63,6 +71,7 @@ A personal companion that handles the "mechanics" of college life, allowing the 
 *   **AI Integration**: Firebase Vertex AI / Gemini Pro API for **Natural Language Scheduling** and Intelligent Tutoring.
 *   **Security Stack**: Android Biometric API + Google Play Integrity API + Acoustic Signal Processing.
 *   **State Management**: MVVM Architecture with Kotlin Flow/StateFlow for reactive UI updates.
+*   **Persistence**: Room Database for robust **Offline-First** capability.
 
 ### **9-Module Scalable Architecture**
 - `:app`: Main entry point, role-aware navigation graphs, and application shell.

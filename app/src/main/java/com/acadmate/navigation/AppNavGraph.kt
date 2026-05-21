@@ -50,7 +50,9 @@ import com.acadmate.dashboard.student.ManageNotificationsScreen
 import com.acadmate.dashboard.student.LeaveApplicationScreen
 import com.acadmate.dashboard.student.LeaveViewModel
 import com.acadmate.dashboard.faculty.LeaveManagementScreen
+import com.acadmate.auth.ui.AuthUiState
 import com.acadmate.auth.ui.ProfileSetupScreen
+import com.acadmate.auth.ui.ResetPasswordScreen
 import com.acadmate.auth.ui.LoginScreen
 import com.acadmate.auth.ui.OtpScreen
 import com.acadmate.auth.ui.RegistrationScreen
@@ -88,10 +90,22 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.navigation.compose.currentBackStackEntryAsState
 
+import androidx.navigation.NavController
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavDestination.Companion.hierarchy
+
+fun NavController.getStackEntrySafe(route: Any): NavBackStackEntry? {
+    return try {
+        getBackStackEntry(route)
+    } catch (_: Exception) {
+        null
+    }
+}
 
 @Composable
 fun SimplePlaceholderScreen(
@@ -141,6 +155,7 @@ fun MainShell(
     onboardingViewModel: OnboardingViewModel = hiltViewModel(),
     content: @Composable (PaddingValues) -> Unit
 ) {
+    val scope = rememberCoroutineScope()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
     val dataStore = onboardingViewModel.onboardingDataStore
@@ -157,9 +172,11 @@ fun MainShell(
         AppLockScreen(
             onUnlockSuccess = { isAppUnlocked = true },
             onSignOut = {
-                authViewModel.signOut()
-                navController.navigate(Routes.AuthGraph) {
-                    popUpTo(navController.graph.id) { inclusive = true }
+                scope.launch {
+                    authViewModel.signOut()
+                    navController.navigate(Routes.AuthGraph) {
+                        popUpTo(navController.graph.id) { inclusive = true }
+                    }
                 }
             },
             dataStore = dataStore
@@ -215,6 +232,7 @@ fun AppNavGraph(
     navController: NavHostController,
     startDestination: Any = Routes.Splash
 ) {
+    val scope = rememberCoroutineScope()
     MainShell(navController) { padding: PaddingValues ->
         NavHost(
             navController = navController,
@@ -272,27 +290,22 @@ fun AppNavGraph(
                 }
                 composable<Routes.Login> { backStackEntry ->
                     val parentEntry = remember(backStackEntry) {
-                        try {
-                            navController.getBackStackEntry(Routes.AuthGraph)
-                        } catch (_: Exception) {
-                            null
-                        }
+                        navController.getStackEntrySafe(Routes.AuthGraph) ?: backStackEntry
                     }
+                    val viewModel: AuthViewModel = hiltViewModel(parentEntry)
                     
-                    val viewModel: AuthViewModel = if (parentEntry != null) {
-                        hiltViewModel(parentEntry)
-                    } else {
-                        hiltViewModel()
-                    }
-
                     LoginScreen(
-                        viewModel = viewModel,
                         onOtpSent = { phoneNumber ->
                             navController.navigate(Routes.Otp(phoneNumber))
                         },
-                        onLoginSuccess = { _ ->
-                            navController.navigate(Routes.MainGraph) {
-                                popUpTo(Routes.AuthGraph) { inclusive = true }
+                        viewModel = viewModel,
+                        onLoginSuccess = { state ->
+                            if (state is AuthUiState.ForcePasswordChange) {
+                                navController.navigate(Routes.ResetPassword(state.userId))
+                            } else {
+                                navController.navigate(Routes.MainGraph) {
+                                    popUpTo(Routes.AuthGraph) { inclusive = true }
+                                }
                             }
                         },
                         onBack = {
@@ -302,7 +315,7 @@ fun AppNavGraph(
                 }
                 composable<Routes.Otp> { backStackEntry ->
                     val parentEntry = remember(backStackEntry) {
-                        navController.getBackStackEntry(Routes.AuthGraph)
+                        navController.getStackEntrySafe(Routes.AuthGraph) ?: backStackEntry
                     }
                     val viewModel: AuthViewModel = hiltViewModel(parentEntry)
                     val route: Routes.Otp = backStackEntry.toRoute()
@@ -310,13 +323,30 @@ fun AppNavGraph(
                     OtpScreen(
                         phoneNumber = route.phoneNumber,
                         viewModel = viewModel,
-                        onVerificationSuccess = {
-                            navController.navigate(Routes.MainGraph) {
-                                popUpTo(Routes.AuthGraph) { inclusive = true }
+                        onVerificationSuccess = { state ->
+                            if (state is AuthUiState.ForcePasswordChange) {
+                                navController.navigate(Routes.ResetPassword(state.userId)) {
+                                    popUpTo(Routes.AuthGraph) { inclusive = true }
+                                }
+                            } else {
+                                navController.navigate(Routes.MainGraph) {
+                                    popUpTo(Routes.AuthGraph) { inclusive = true }
+                                }
                             }
                         },
                         onBackToLogin = {
                             navController.popBackStack()
+                        }
+                    )
+                }
+                composable<Routes.ResetPassword> {
+                    val viewModel: AuthViewModel = hiltViewModel()
+                    ResetPasswordScreen(
+                        viewModel = viewModel,
+                        onSuccess = { _ ->
+                            navController.navigate(Routes.MainGraph) {
+                                popUpTo(Routes.AuthGraph) { inclusive = true }
+                            }
                         }
                     )
                 }
@@ -390,14 +420,17 @@ fun AppNavGraph(
                             AdminDashboardScreen(
                                 onAddUserClick = { navController.navigate(Routes.CreateUser) },
                                 onManageCoursesClick = { navController.navigate(Routes.CourseManagement) },
+                                onSyllabusClick = { navController.navigate(Routes.ManageSyllabus) },
                                 onScheduleClick = { navController.navigate(Routes.TimetableManagement) },
                                 onAiScheduleClick = { navController.navigate(Routes.AiTimetableGenerator) },
                                 onAuditLogClick = { navController.navigate(Routes.AuditLog) },
                                 onSettingsClick = { navController.navigate(Routes.CampusSetup) },
                                 onSignOut = {
-                                    authViewModel.signOut()
-                                    navController.navigate(Routes.AuthGraph) {
-                                        popUpTo(navController.graph.id) { inclusive = true }
+                                    scope.launch {
+                                        authViewModel.signOut()
+                                        navController.navigate(Routes.AuthGraph) {
+                                            popUpTo(navController.graph.id) { inclusive = true }
+                                        }
                                     }
                                 }
                             )
@@ -414,7 +447,9 @@ fun AppNavGraph(
                                         "Timetable" -> navController.navigate(Routes.Timetable)
                                         "View Attendance" -> navController.navigate(Routes.Attendance)
                                         "Gradebook" -> navController.navigate(Routes.Gradebook)
-                                        "View Syllabus" -> navController.navigate(Routes.SyllabusBrowser)
+                                        "View Syllabus" -> navController.navigate(Routes.Syllabus)
+                                        "Lesson Planner" -> navController.navigate(Routes.AiChat(mode = "PLANNER"))
+                                        "Quiz Generator" -> navController.navigate(Routes.MockExamSetup)
                                     }
                                 },
                                 onClassClick = { classId, hour ->
@@ -563,12 +598,6 @@ fun AppNavGraph(
                     )
                 }
 
-                composable<Routes.ManageSyllabus> {
-                    com.acadmate.dashboard.faculty.SyllabusManagementScreen(
-                        onBackClick = { navController.popBackStack() }
-                    )
-                }
-
                 composable<Routes.MockExamSetup>(
                     enterTransition = { slideInVertically(initialOffsetY = { it }) }
                 ) {
@@ -631,9 +660,11 @@ fun AppNavGraph(
                 ProfileScreen(
                     onBackClick = { navController.popBackStack() },
                     onSignOut = {
-                        authViewModel.signOut()
-                        navController.navigate(Routes.AuthGraph) {
-                            popUpTo(navController.graph.id) { inclusive = true }
+                        scope.launch {
+                            authViewModel.signOut()
+                            navController.navigate(Routes.AuthGraph) {
+                                popUpTo(navController.graph.id) { inclusive = true }
+                            }
                         }
                     },
                     onNotificationsClick = { navController.navigate(Routes.Notifications) },
@@ -681,9 +712,11 @@ fun AppNavGraph(
                         onAuditLogClick = { navController.navigate(Routes.AuditLog) },
                         onSettingsClick = { navController.navigate(Routes.CampusSetup) },
                         onSignOut = {
-                            authViewModel.signOut()
-                            navController.navigate(Routes.AuthGraph) {
-                                popUpTo(navController.graph.id) { inclusive = true }
+                            scope.launch {
+                                authViewModel.signOut()
+                                navController.navigate(Routes.AuthGraph) {
+                                    popUpTo(navController.graph.id) { inclusive = true }
+                                }
                             }
                         }
                     )

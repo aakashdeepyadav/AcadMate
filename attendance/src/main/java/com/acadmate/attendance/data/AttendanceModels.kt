@@ -8,6 +8,7 @@ sealed class AttendanceUiState {
     object Loading : AttendanceUiState()
     object ScanningBle : AttendanceUiState()
     object VerifyingAcoustic : AttendanceUiState()
+    object ScanningQr : AttendanceUiState()
     object VerifyingIdentity : AttendanceUiState()
     object VerifyingLocation : AttendanceUiState()
     data class Verified(

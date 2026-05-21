@@ -132,7 +132,7 @@ fun ActiveSessionsBrowserScreen(
                                         )
                                         Spacer(modifier = Modifier.height(4.dp))
                                         Text(
-                                            text = "Started by: ${session.facultyId}",
+                                            text = "Started by: ${session.facultyName}",
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )

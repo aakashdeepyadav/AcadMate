@@ -9,9 +9,12 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -34,8 +37,18 @@ fun LectureNotesScreen(
     viewModel: LectureNotesViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val availableSubjects by viewModel.availableSubjects.collectAsState()
     val haptic = rememberAcadMateHapticFeedback()
     val context = androidx.compose.ui.platform.LocalContext.current
+
+    var selectedSubject by remember { mutableStateOf<String?>(null) }
+    var selectedUnit by remember { mutableStateOf<String?>(null) }
+
+    val subjects = remember(availableSubjects) { availableSubjects.map { it.subjectName } }
+    val units = remember(selectedSubject, availableSubjects) {
+        if (selectedSubject == null) emptyList()
+        else availableSubjects.find { it.subjectName == selectedSubject }?.units?.map { it.title } ?: emptyList()
+    }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -63,6 +76,13 @@ fun LectureNotesScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
+                actions = {
+                    if (uiState !is LectureUiState.Idle) {
+                        IconButton(onClick = { viewModel.reset() }) {
+                            Icon(Icons.Default.Refresh, contentDescription = "Reset")
+                        }
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Color.Transparent
                 )
@@ -82,35 +102,108 @@ fun LectureNotesScreen(
                 )
                 .padding(padding)
         ) {
-            AnimatedContent(
-                targetState = uiState,
-                transitionSpec = {
-                    fadeIn() togetherWith fadeOut()
-                },
-                label = "LectureUIState"
-            ) { state ->
-                when (state) {
-                    is LectureUiState.Idle -> {
-                        IdleContent(onStart = { 
-                            val permission = android.Manifest.permission.RECORD_AUDIO
-                            if (androidx.core.content.ContextCompat.checkSelfPermission(context, permission) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                                viewModel.startRecording()
-                            } else {
-                                permissionLauncher.launch(permission)
+            Column(modifier = Modifier.fillMaxSize()) {
+                // Context Selectors (Hidden by default, can be toggled)
+                var showContextSetup by remember { mutableStateOf(false) }
+
+                if (uiState is LectureUiState.Idle) {
+                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = if (selectedSubject != null) "Topic: $selectedSubject" else "General Lecture",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            TextButton(onClick = { showContextSetup = !showContextSetup }) {
+                                Text(if (showContextSetup) "Hide Setup" else "Change Topic")
                             }
-                        })
+                        }
+                        
+                        AnimatedVisibility(visible = showContextSetup) {
+                            Column {
+                                // Subject Chips
+                                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    items(subjects) { subject ->
+                                        FilterChip(
+                                            selected = selectedSubject == subject,
+                                            onClick = { 
+                                                selectedSubject = if (selectedSubject == subject) null else subject 
+                                                selectedUnit = null
+                                            },
+                                            label = { Text(subject) }
+                                        )
+                                    }
+                                }
+
+                                // Unit Chips
+                                AnimatedVisibility(visible = units.isNotEmpty()) {
+                                    LazyRow(
+                                        modifier = Modifier.padding(top = 8.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        items(units) { unit ->
+                                            FilterChip(
+                                                selected = selectedUnit == unit,
+                                                onClick = { selectedUnit = if (selectedUnit == unit) null else unit },
+                                                label = { Text(unit) },
+                                                colors = FilterChipDefaults.filterChipColors(
+                                                    selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer
+                                                )
+                                            )
+                                        }
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
+                            }
+                        }
+                        HorizontalDivider(modifier = Modifier.padding(top = 4.dp).graphicsLayer(alpha = 0.3f))
                     }
-                    is LectureUiState.Recording -> {
-                        RecordingContent(onStop = { viewModel.stopRecordingAndProcess() })
-                    }
-                    is LectureUiState.Processing -> {
-                        ProcessingContent()
-                    }
-                    is LectureUiState.Success -> {
-                        SuccessContent(notes = state.notes, onSave = { viewModel.saveNotes(state.notes, "AI_SUMMARY_${System.currentTimeMillis()}") })
-                    }
-                    is LectureUiState.Error -> {
-                        ErrorContent(message = state.message, onRetry = { viewModel.startRecording() })
+                }
+
+                Box(modifier = Modifier.weight(1f)) {
+                    AnimatedContent(
+                        targetState = uiState,
+                        transitionSpec = {
+                            fadeIn() togetherWith fadeOut()
+                        },
+                        label = "LectureUIState"
+                    ) { state ->
+                        when (state) {
+                            is LectureUiState.Idle -> {
+                                IdleContent(onStart = { 
+                                    val permission = android.Manifest.permission.RECORD_AUDIO
+                                    if (androidx.core.content.ContextCompat.checkSelfPermission(context, permission) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                                        viewModel.startRecording()
+                                    } else {
+                                        permissionLauncher.launch(permission)
+                                    }
+                                })
+                            }
+                            is LectureUiState.Recording -> {
+                                RecordingContent(onStop = { 
+                                    viewModel.stopRecordingAndProcess(
+                                        selectedSubject ?: "Current Lecture",
+                                        selectedUnit
+                                    ) 
+                                })
+                            }
+                            is LectureUiState.Processing -> {
+                                ProcessingContent()
+                            }
+                            is LectureUiState.Success -> {
+                                SuccessContent(
+                                    notes = state.notes, 
+                                    onSave = { viewModel.saveNotes(state.notes, selectedSubject ?: "GENERAL") }
+                                )
+                            }
+                            is LectureUiState.Error -> {
+                                ErrorContent(message = state.message, onRetry = { viewModel.startRecording() })
+                            }
+                        }
                     }
                 }
             }

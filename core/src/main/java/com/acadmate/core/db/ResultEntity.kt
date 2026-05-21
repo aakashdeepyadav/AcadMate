@@ -1,13 +1,25 @@
 package com.acadmate.core.db
 
+import androidx.room.Entity
+import androidx.room.Index
+import androidx.room.PrimaryKey
+import kotlinx.serialization.Serializable
+
+@Entity(
+    tableName = "semester_results",
+    indices = [Index(value = ["userId"])]
+)
+@Serializable
 data class SemesterResultEntity(
-    val id: String = "",
-    val semesterName: String = "",
-    val sgpa: Float = 0f,
-    val credits: Int = 0,
-    val subjects: List<SubjectGradeEntity> = emptyList()
+    @PrimaryKey val id: String, // Semester ID (e.g., "6")
+    val userId: String,
+    val semesterName: String,
+    val sgpa: Float,
+    val credits: Int,
+    val subjects: List<SubjectGradeEntity>
 )
 
+@Serializable
 data class SubjectGradeEntity(
     val subjectName: String = "",
     val code: String = "",

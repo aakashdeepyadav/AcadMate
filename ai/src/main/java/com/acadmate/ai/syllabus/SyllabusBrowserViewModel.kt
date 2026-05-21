@@ -2,18 +2,19 @@ package com.acadmate.ai.syllabus
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.acadmate.core.model.PredefinedSyllabus
 import com.acadmate.core.model.SubjectSyllabus
 import com.acadmate.core.db.UserRepository
+import com.acadmate.core.db.SyllabusRepository
 import com.acadmate.core.model.UserRole
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 
 sealed class BrowserUiState {
@@ -24,39 +25,42 @@ sealed class BrowserUiState {
 
 @HiltViewModel
 class SyllabusBrowserViewModel @Inject constructor(
-    private val userRepository: UserRepository
+    private val userRepository: UserRepository,
+    private val syllabusRepository: SyllabusRepository
 ) : ViewModel() {
-    private val firestore = FirebaseFirestore.getInstance()
     
-    private val _uiState = MutableStateFlow<BrowserUiState>(BrowserUiState.Loading)
-    val uiState: StateFlow<BrowserUiState> = _uiState
+    private val _isLoading = MutableStateFlow(false)
+    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
+    val uiState: StateFlow<BrowserUiState> = combine(
+        syllabusRepository.getAllSyllabuses(),
+        userRepository.getCurrentUser(),
+        _isLoading
+    ) { syllabuses, user, loading ->
+        if (loading && syllabuses.isEmpty()) {
+            BrowserUiState.Loading
+        } else {
+            var list = syllabuses
+            if (user?.role == UserRole.FACULTY) {
+                // Filter logic for faculty could be moved to repository if needed
+                // For now, keep it here or simplify
+            }
+            BrowserUiState.Success(list)
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), BrowserUiState.Loading)
     
     init {
-        fetchSyllabuses()
+        syncData()
     }
     
-    fun fetchSyllabuses() {
+    fun syncData() {
         viewModelScope.launch {
-            _uiState.value = BrowserUiState.Loading
+            _isLoading.value = true
             try {
-                val user = userRepository.getCurrentUser().first()
-                val snapshot = firestore.collection("syllabuses").get().await()
-                var list = snapshot.toObjects(SubjectSyllabus::class.java)
-
-                // If user is faculty, filter list to only show their assigned courses
-                if (user?.role == UserRole.FACULTY) {
-                    val assignedCoursesSnapshot = firestore.collection("courses")
-                        .whereEqualTo("assignedFaculty", user.name)
-                        .get()
-                        .await()
-                    
-                    val assignedCodes = assignedCoursesSnapshot.documents.map { it.getString("code") ?: "" }.toSet()
-                    list = list.filter { it.subjectCode in assignedCodes }
-                }
-
-                _uiState.value = BrowserUiState.Success(list)
+                syllabusRepository.syncSyllabuses()
             } catch (e: Exception) {
-                _uiState.value = BrowserUiState.Error(e.message ?: "Failed to load syllabus")
+            } finally {
+                _isLoading.value = false
             }
         }
     }

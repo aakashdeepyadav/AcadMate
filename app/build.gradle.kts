@@ -79,6 +79,7 @@ dependencies {
     implementation(project(":admin"))
     implementation(project(":assignments"))
     implementation(libs.androidx.lottie.compose)
+    implementation(libs.coil.compose)
     implementation(libs.com.google.play.services.auth)
     implementation(libs.com.google.dagger.hilt.android)
     implementation(libs.androidx.hilt.navigation.compose)

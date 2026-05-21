@@ -48,7 +48,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 @Composable
 fun OtpScreen(
     phoneNumber: String,
-    onVerificationSuccess: () -> Unit,
+    onVerificationSuccess: (AuthUiState) -> Unit,
     onBackToLogin: () -> Unit,
     viewModel: AuthViewModel = hiltViewModel()
 ) {
@@ -69,8 +69,10 @@ fun OtpScreen(
     }
 
     // Handle verification success
-    if (uiState is AuthUiState.Verified) {
-        LoginSuccessScreen(onVerificationSuccess)
+    if (uiState is AuthUiState.Verified || uiState is AuthUiState.ForcePasswordChange) {
+        LoginSuccessScreen {
+            onVerificationSuccess(uiState)
+        }
         return
     }
 
@@ -138,7 +140,7 @@ fun OtpScreen(
                             onOtpChange = { newOtp ->
                                 if (newOtp.length <= 6 && newOtp.all { it.isDigit() }) {
                                     otp = newOtp
-                                    if (newOtp.length == 6) {
+                                    if (newOtp.length == 6 && uiState !is AuthUiState.Loading) {
                                         viewModel.verifyOtp(newOtp)
                                     }
                                 }

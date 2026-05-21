@@ -62,14 +62,16 @@ class FacultyHomeViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
             userRepository.getCurrentUser().collectLatest { user ->
-                user?.let {
+                if (user != null) {
                     _uiState.value = _uiState.value.copy(
-                        name = it.name,
-                        email = it.email,
-                        department = it.department ?: "",
-                        profilePictureUrl = it.profilePictureUrl
+                        name = user.name,
+                        email = user.email,
+                        department = user.department ?: "",
+                        profilePictureUrl = user.profilePictureUrl
                     )
-                    loadFacultyClasses(it.name)
+                    loadFacultyClasses(user.name)
+                } else {
+                    _uiState.value = FacultyHomeUiState()
                 }
                 _uiState.value = _uiState.value.copy(isLoading = false)
             }

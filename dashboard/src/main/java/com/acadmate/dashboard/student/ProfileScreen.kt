@@ -300,7 +300,7 @@ fun ProfileScreen(
                             InfoRow("Email", uiState.email)
                             InfoRow("Address", uiState.address)
                             if (!isAdmin) {
-                                InfoRow(if (isFaculty) "Employee ID" else "Enrollment", uiState.enrollment)
+                                InfoRow(if (isFaculty) "UID" else "Enrollment", uiState.enrollment)
                                 InfoRow("Department", uiState.department)
                             }
                             InfoRow("Role", uiState.role, isLast = true)
@@ -317,12 +317,14 @@ fun ProfileScreen(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(LocalSpacing.current.smd)
                         ) {
-                            ProfileQuickAction(
-                                icon = Icons.Default.Notifications,
-                                label = "Notifs",
-                                modifier = Modifier.weight(1f),
-                                onClick = onNotificationsClick
-                            )
+                            if (!isAdmin) {
+                                ProfileQuickAction(
+                                    icon = Icons.Default.Notifications,
+                                    label = "Notifs",
+                                    modifier = Modifier.weight(1f),
+                                    onClick = onNotificationsClick
+                                )
+                            }
                             ProfileQuickAction(
                                 icon = Icons.Default.Shield,
                                 label = "Privacy",
@@ -341,6 +343,9 @@ fun ProfileScreen(
                                 modifier = Modifier.weight(1f),
                                 onClick = onAboutClick
                             )
+                            if (isAdmin) {
+                                Spacer(modifier = Modifier.weight(1f))
+                            }
                         }
                     }
 
@@ -370,17 +375,19 @@ fun ProfileScreen(
                                     )
                                 }
                             )
-                            HorizontalDivider(
-                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.1f),
-                                thickness = 0.5.dp,
-                                modifier = Modifier.padding(vertical = 4.dp)
-                            )
-                            SettingsRow(
-                                icon = Icons.Default.Notifications,
-                                title = "Push Notifications",
-                                subtitle = "Manage preferences",
-                                onClick = onPushNotificationsClick
-                            )
+                            if (!isAdmin) {
+                                HorizontalDivider(
+                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.1f),
+                                    thickness = 0.5.dp,
+                                    modifier = Modifier.padding(vertical = 4.dp)
+                                )
+                                SettingsRow(
+                                    icon = Icons.Default.Notifications,
+                                    title = "Push Notifications",
+                                    subtitle = "Manage preferences",
+                                    onClick = onPushNotificationsClick
+                                )
+                            }
                             HorizontalDivider(
                                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.1f),
                                 thickness = 0.5.dp,
@@ -445,7 +452,7 @@ fun EditProfileDialog(
                 AcadMateTextField(
                     value = email,
                     onValueChange = { email = it },
-                    label = "Institutional Email",
+                    label = "Email",
                     placeholder = "Enter your email",
                     leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, modifier = Modifier.size(18.dp)) }
                 )

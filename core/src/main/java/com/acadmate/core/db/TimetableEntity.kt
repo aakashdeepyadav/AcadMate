@@ -1,9 +1,13 @@
 package com.acadmate.core.db
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "timetable")
+@Entity(
+    tableName = "timetable",
+    indices = [Index(value = ["dayOfWeek"])]
+)
 data class TimetableEntity(
     @PrimaryKey val id: String,
     val dayOfWeek: Int, // 1 (Mon) to 7 (Sun)

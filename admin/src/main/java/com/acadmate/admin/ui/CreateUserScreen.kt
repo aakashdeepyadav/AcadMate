@@ -1,5 +1,7 @@
 package com.acadmate.admin.ui
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -38,6 +40,46 @@ fun CreateUserScreen(
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    val csvPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let {
+            scope.launch {
+                try {
+                    val inputStream = context.contentResolver.openInputStream(it)
+                    val reader = inputStream?.bufferedReader()
+                    val header = reader?.readLine() // Skip header
+                    
+                    val users = mutableListOf<Map<String, String>>()
+                    reader?.forEachLine { line ->
+                        val parts = line.split(",")
+                        if (parts.size >= 5) {
+                            users.add(mapOf(
+                                "regNo" to parts[0].trim(),
+                                "name" to parts[1].trim(),
+                                "email" to parts[2].trim(),
+                                "role" to parts[3].trim().uppercase(),
+                                "phoneNumber" to parts[4].trim()
+                            ))
+                        }
+
+                    }
+                    inputStream?.close()
+                    
+                    if (users.isNotEmpty()) {
+                        viewModel.bulkCreateUsers(users)
+                        snackbarHostState.showSnackbar("Importing ${users.size} users...")
+                    } else {
+                        snackbarHostState.showSnackbar("No valid user data found in CSV")
+                    }
+                } catch (e: Exception) {
+                    snackbarHostState.showSnackbar("CSV Error: ${e.message}")
+                }
+            }
+        }
+    }
 
     LaunchedEffect(uiState) {
         if (uiState is AdminUiState.Error) {
@@ -79,6 +121,11 @@ fun CreateUserScreen(
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { csvPickerLauncher.launch("text/*") }) {
+                        Icon(Icons.Default.FileUpload, contentDescription = "Bulk Upload CSV")
                     }
                 }
             )
@@ -147,46 +194,26 @@ fun UserFormDialog(
     onDismiss: () -> Unit,
     onSave: (String, String, String, UserRole, String) -> Unit
 ) {
+    var selectedRole by remember { mutableStateOf(user?.role ?: UserRole.STUDENT) }
     var regNo by remember { mutableStateOf(user?.regNo ?: "") }
     var name by remember { mutableStateOf(user?.name ?: "") }
     var email by remember { mutableStateOf(user?.email ?: "") }
     var phoneNumber by remember { mutableStateOf(user?.phoneNumber ?: "") }
-    var selectedRole by remember { mutableStateOf(user?.role ?: UserRole.STUDENT) }
     var expanded by remember { mutableStateOf(false) }
+
+    // Dynamic ID Length Constraint
+    val expectedIdLength = when (selectedRole) {
+        UserRole.ADMIN -> 4
+        UserRole.FACULTY -> 6
+        UserRole.STUDENT -> 8
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (user == null) "Add New User" else "Edit User Info") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(LocalSpacing.current.md)) {
-                AcadMateTextField(
-                    value = regNo,
-                    onValueChange = { if (it.all { char -> char.isDigit() }) regNo = it },
-                    label = "Registration Number",
-                    modifier = Modifier.fillMaxWidth(),
-                    readOnly = user != null // Don't allow changing ID during edit
-                )
-                AcadMateTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = "Full Name",
-                    modifier = Modifier.fillMaxWidth()
-                )
-                AcadMateTextField(
-                    value = email,
-                    onValueChange = { email = it },
-                    label = "Institutional Email",
-                    placeholder = "user@university.edu",
-                    modifier = Modifier.fillMaxWidth()
-                )
-                AcadMateTextField(
-                    value = phoneNumber,
-                    onValueChange = { if (it.all { char -> char.isDigit() } && it.length <= 13) phoneNumber = it },
-                    label = "Phone Number",
-                    placeholder = "10-digit mobile",
-                    modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone)
-                )
+                // 1. SELECT ROLE FIRST (Moved to top)
                 Box(modifier = Modifier.fillMaxWidth()) {
                     ExposedDropdownMenuBox(
                         expanded = expanded,
@@ -196,9 +223,10 @@ fun UserFormDialog(
                             value = selectedRole.name,
                             onValueChange = {},
                             readOnly = true,
-                            label = "Role",
+                            label = "User Role",
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                            modifier = Modifier.menuAnchor().fillMaxWidth()
+                            modifier = Modifier.menuAnchor().fillMaxWidth(),
+                            enabled = user == null // Don't allow changing role during edit
                         )
                         ExposedDropdownMenu(
                             expanded = expanded,
@@ -210,19 +238,76 @@ fun UserFormDialog(
                                     onClick = {
                                         selectedRole = role
                                         expanded = false
+                                        // Auto-truncate or clear ID if role changes to a smaller requirement
+                                        if (regNo.length > when(role){
+                                            UserRole.ADMIN -> 4
+                                            UserRole.FACULTY -> 6
+                                            UserRole.STUDENT -> 8
+                                        }) {
+                                            regNo = regNo.take(when(role){
+                                                UserRole.ADMIN -> 4
+                                                UserRole.FACULTY -> 6
+                                                UserRole.STUDENT -> 8
+                                            })
+                                        }
                                     }
                                 )
                             }
                         }
                     }
                 }
+
+                // 2. ID WITH DYNAMIC CONSTRAINT
+                AcadMateTextField(
+                    value = regNo,
+                    onValueChange = { input ->
+                        if (input.all { char -> char.isDigit() } && input.length <= expectedIdLength) {
+                            regNo = input
+                        }
+                    },
+                    label = "Enrollment / UID",
+                    placeholder = "Enter $expectedIdLength digits",
+                    modifier = Modifier.fillMaxWidth(),
+                    readOnly = user != null,
+                    supportingText = {
+                        Text(
+                            text = "Required: $expectedIdLength digits for ${selectedRole.name}",
+                            color = if (regNo.length == expectedIdLength) Color(0xFF10B981) 
+                                    else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                )
+
+                AcadMateTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = "Full Name",
+                    modifier = Modifier.fillMaxWidth()
+                )
+                
+                AcadMateTextField(
+                    value = email,
+                    onValueChange = { email = it },
+                    label = "Email",
+                    placeholder = "user@university.edu",
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                AcadMateTextField(
+                    value = phoneNumber,
+                    onValueChange = { if (it.all { char -> char.isDigit() } && it.length <= 13) phoneNumber = it },
+                    label = "Phone Number",
+                    placeholder = "10-digit mobile",
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone)
+                )
             }
         },
         confirmButton = {
             AcadMateButton(
                 text = if (user == null) "Create" else "Save Changes",
                 onClick = { onSave(regNo, name, email, selectedRole, phoneNumber) },
-                enabled = regNo.isNotBlank() && name.isNotBlank() && email.isNotBlank()
+                enabled = regNo.length == expectedIdLength && name.isNotBlank() && email.isNotBlank()
             )
         },
         dismissButton = {

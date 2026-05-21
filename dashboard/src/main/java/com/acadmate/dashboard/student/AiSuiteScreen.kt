@@ -76,8 +76,8 @@ fun AiSuiteScreen(
         ),
         AiFeature(
             id = "mock_exam",
-            title = "Mock Exams",
-            description = "Generate and take AI-powered mock exams tailored to your syllabus",
+            title = "Smart Quizzes",
+            description = "Search for available faculty quizzes or generate practice MCQs for yourself",
             icon = Icons.Default.Quiz,
             gradientColors = listOf(Color(0xFFEF4444), Color(0xFFF87171))
         ),

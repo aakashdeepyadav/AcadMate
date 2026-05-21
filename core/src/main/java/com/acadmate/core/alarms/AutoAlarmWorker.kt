@@ -4,6 +4,9 @@ import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.acadmate.core.db.TimetableRepository
+import com.acadmate.core.db.UserRepository
+import com.acadmate.core.datastore.OnboardingDataStore
+import com.acadmate.core.model.UserRole
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
@@ -17,13 +20,13 @@ import kotlinx.coroutines.flow.first
 
 @HiltWorker
 class AutoAlarmWorker @AssistedInject constructor(
-    @Assisted appContext: Context,
+    @Assisted context: Context,
     @Assisted workerParams: WorkerParameters,
     private val repository: TimetableRepository,
-    private val userRepository: com.acadmate.core.db.UserRepository,
+    private val userRepository: UserRepository,
     private val alarmScheduler: AndroidAlarmScheduler,
-    private val onboardingDataStore: com.acadmate.core.datastore.OnboardingDataStore
-) : CoroutineWorker(appContext, workerParams) {
+    private val onboardingDataStore: OnboardingDataStore
+) : CoroutineWorker(context, workerParams) {
 
     override suspend fun doWork(): Result {
         return try {
@@ -37,8 +40,8 @@ class AutoAlarmWorker @AssistedInject constructor(
                 ?: return Result.success()
             
             // This functionality is for students and teachers only
-            if (user.role != com.acadmate.core.model.UserRole.STUDENT && 
-                user.role != com.acadmate.core.model.UserRole.FACULTY) {
+            if (user.role != UserRole.STUDENT && 
+                user.role != UserRole.FACULTY) {
                 return Result.success()
             }
 

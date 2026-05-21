@@ -37,7 +37,8 @@ fun AcadMateTextField(
     visualTransformation: VisualTransformation = VisualTransformation.None,
     singleLine: Boolean = true,
     enabled: Boolean = true,
-    readOnly: Boolean = false
+    readOnly: Boolean = false,
+    supportingText: @Composable (() -> Unit)? = null
 ) {
     Column(modifier = modifier) {
         OutlinedTextField(
@@ -78,7 +79,7 @@ fun AcadMateTextField(
             singleLine = singleLine,
             enabled = enabled,
             readOnly = readOnly,
-            supportingText = {
+            supportingText = supportingText ?: {
                 if (isError && errorMessage.isNotEmpty()) {
                     Text(
                         text = errorMessage,

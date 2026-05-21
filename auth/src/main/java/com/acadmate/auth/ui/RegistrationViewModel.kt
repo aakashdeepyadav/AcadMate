@@ -147,12 +147,17 @@ class RegistrationViewModel @Inject constructor(
                     val credential = com.google.firebase.auth.EmailAuthProvider.getCredential(email, password)
                     currentUser.linkWithCredential(credential).await()
                 } catch (e: Exception) {
-                    // If account already exists or linking fails, we might still want to proceed if it's just a profile update
-                    // But for first time setup, linking is crucial.
-                    if (e is com.google.firebase.auth.FirebaseAuthUserCollisionException) {
-                         // Email already in use
+                    val msg = e.message ?: ""
+                    if (msg.contains("already been linked", ignoreCase = true) || 
+                        msg.contains("provider-already-linked", ignoreCase = true)) {
+                        // Already linked, we can proceed
+                        android.util.Log.d("RegistrationViewModel", "Email already linked, proceeding")
+                    } else if (e is com.google.firebase.auth.FirebaseAuthUserCollisionException) {
+                         // Email already in use by ANOTHER account
                          _uiState.value = RegistrationUiState.Error("This email is already registered with another account")
                          return@launch
+                    } else {
+                        throw e
                     }
                 }
 

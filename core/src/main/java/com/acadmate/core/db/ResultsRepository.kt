@@ -1,16 +1,23 @@
 package com.acadmate.core.db
 
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class ResultsRepository @Inject constructor() {
+class ResultsRepository @Inject constructor(
+    private val resultDao: ResultDao
+) {
     private val firestore = FirebaseFirestore.getInstance()
 
-    suspend fun getResultsForUser(userId: String): List<SemesterResultEntity> {
-        return try {
+    fun getResultsForUser(userId: String): Flow<List<SemesterResultEntity>> {
+        return resultDao.getResultsForUser(userId)
+    }
+
+    suspend fun syncResults(userId: String) {
+        try {
             val snapshot = firestore.collection("users")
                 .document(userId)
                 .collection("results")
@@ -18,7 +25,7 @@ class ResultsRepository @Inject constructor() {
                 .get()
                 .await()
 
-            snapshot.documents.mapNotNull { doc ->
+            val remoteItems = snapshot.documents.mapNotNull { doc ->
                 val subjectsMap = doc.get("subjects") as? List<Map<String, Any>> ?: emptyList()
                 val subjects = subjectsMap.map { subMap ->
                     SubjectGradeEntity(
@@ -31,14 +38,22 @@ class ResultsRepository @Inject constructor() {
 
                 SemesterResultEntity(
                     id = doc.id,
+                    userId = userId,
                     semesterName = doc.getString("semesterName") ?: "",
                     sgpa = (doc.getDouble("sgpa"))?.toFloat() ?: 0f,
                     credits = (doc.getLong("credits"))?.toInt() ?: 0,
                     subjects = subjects
                 )
             }
+
+            if (remoteItems.isNotEmpty()) {
+                // For a clean cache, we might want to clear old results for this user
+                // but Room clearAll usually deletes everything. 
+                // Since this is a single user app for now, it's fine.
+                resultDao.insertResults(remoteItems)
+            }
         } catch (e: Exception) {
-            emptyList()
+            // Offline
         }
     }
 
@@ -46,6 +61,7 @@ class ResultsRepository @Inject constructor() {
         val initialResults = listOf(
             SemesterResultEntity(
                 id = "4",
+                userId = userId,
                 semesterName = "Semester 4",
                 sgpa = 8.6f,
                 credits = 24,
@@ -57,6 +73,7 @@ class ResultsRepository @Inject constructor() {
             ),
             SemesterResultEntity(
                 id = "5",
+                userId = userId,
                 semesterName = "Semester 5",
                 sgpa = 8.9f,
                 credits = 24,
@@ -76,5 +93,6 @@ class ResultsRepository @Inject constructor() {
                 .set(result)
                 .await()
         }
+        syncResults(userId)
     }
 }

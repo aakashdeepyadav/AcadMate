@@ -2,6 +2,7 @@ package com.acadmate.ui.splash
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
@@ -13,12 +14,14 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import coil.compose.AsyncImage
 import com.acadmate.designsystem.theme.AcadMateTheme
-import com.acadmate.designsystem.components.AcadMateLogo
+import com.acadmate.R
 import kotlinx.coroutines.delay
 
 import androidx.compose.ui.tooling.preview.Preview
@@ -92,15 +95,16 @@ fun SplashScreen(
                 .scale(scaleAnim)
                 .alpha(alphaAnim)
         ) {
-            AcadMateLogo(
-                iconSize = 140.dp,
-                showText = false
+            AsyncImage(
+                model = R.drawable.acadmate,
+                contentDescription = "AcadMate Logo",
+                modifier = Modifier.size(160.dp)
             )
             
             Spacer(modifier = Modifier.height(24.dp))
             
             Text(
-                text = "AcadMate",
+                text = "AcadMate Elite",
                 style = MaterialTheme.typography.displaySmall.copy(
                     fontWeight = FontWeight.Black,
                     letterSpacing = (-1.5).sp
@@ -109,19 +113,19 @@ fun SplashScreen(
             )
             
             Text(
-                text = "Academic Precision",
+                text = "The Institutional Operating System",
                 style = MaterialTheme.typography.bodyLarge.copy(
                     fontWeight = FontWeight.Medium,
-                    letterSpacing = 4.sp
+                    letterSpacing = 2.sp
                 ),
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
-                modifier = Modifier.padding(top = 4.dp)
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                modifier = Modifier.padding(top = 8.dp)
             )
         }
         
         // Version footer
         Text(
-            text = "v1.1.0 Premium",
+            text = "v1.2.0-Elite",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
             modifier = Modifier

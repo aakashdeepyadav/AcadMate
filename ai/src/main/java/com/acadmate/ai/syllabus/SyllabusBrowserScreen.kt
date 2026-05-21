@@ -19,13 +19,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.acadmate.core.model.PredefinedSyllabus
 import com.acadmate.core.model.SubjectSyllabus
 import com.acadmate.core.model.SyllabusUnit
+import com.acadmate.core.util.PdfExportUtils
 import com.acadmate.designsystem.components.AcadMateCard
 import com.acadmate.designsystem.components.CardVariant
+import com.acadmate.designsystem.components.AcadMateButton
+import androidx.compose.material.icons.filled.Download
 
 import androidx.hilt.navigation.compose.hiltViewModel
 
@@ -59,7 +63,7 @@ fun SyllabusBrowserScreen(
                 val syllabuses = (uiState as BrowserUiState.Success).syllabuses
                 if (syllabuses.isEmpty()) {
                     Text(
-                        "No syllabi have been published by the faculty yet.",
+                        "No syllabi have been published by the administrator yet.",
                         modifier = Modifier.align(Alignment.Center),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -140,6 +144,7 @@ fun SubjectList(syllabuses: List<SubjectSyllabus>, onSubjectSelect: (SubjectSyll
 
 @Composable
 fun UnitList(syllabus: SubjectSyllabus) {
+    val context = LocalContext.current
     LazyColumn(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -161,6 +166,15 @@ fun UnitList(syllabus: SubjectSyllabus) {
                     Text(
                         syllabus.description,
                         style = MaterialTheme.typography.bodySmall
+                    )
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    AcadMateButton(
+                        text = "Download Syllabus PDF",
+                        onClick = { PdfExportUtils.generateSyllabusPdf(context, syllabus) },
+                        icon = Icons.Default.Download,
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
             }
@@ -219,25 +233,13 @@ fun UnitItemRow(unit: SyllabusUnit) {
             }
 
             AnimatedVisibility(visible = expanded) {
-                Column(modifier = Modifier.padding(top = 16.dp, start = 4.dp)) {
-                    unit.topics.forEach { topic ->
-                        Row(
-                            modifier = Modifier.padding(vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(6.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.primary)
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text(
-                                topic,
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                        }
-                    }
+                Column(modifier = Modifier.padding(top = 12.dp, start = 4.dp)) {
+                    Text(
+                        text = unit.topics.joinToString(", "),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 40.dp)
+                    )
                 }
             }
         }

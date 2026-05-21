@@ -8,6 +8,7 @@ data class Assignment(
     val facultyId: String = "",
     val dueDate: Long = 0,
     val fileUrl: String? = null,
+    val guidelineUrls: List<String> = emptyList(), // PDF/DOC guidelines
     val createdAt: Long = System.currentTimeMillis()
 )
 

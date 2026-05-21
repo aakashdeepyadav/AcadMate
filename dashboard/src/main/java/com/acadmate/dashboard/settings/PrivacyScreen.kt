@@ -50,7 +50,7 @@ fun PrivacyScreen(onBackClick: () -> Unit) {
             
             Text("Information Collection", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Text(
-                "We collect minimal personal data including your Name, Enrollment/Employee ID, and institutional email for authentication and record-keeping purposes only.",
+                "We collect minimal personal data including your Name, Enrollment/UID, and email for authentication and record-keeping purposes only.",
                 style = MaterialTheme.typography.bodyMedium
             )
             

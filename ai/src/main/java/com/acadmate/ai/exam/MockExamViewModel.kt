@@ -50,10 +50,12 @@ data class AiQuestion(
 
 @HiltViewModel
 class MockExamViewModel @Inject constructor(
-    private val generativeModel: GenerativeModel
+    private val generativeModel: GenerativeModel,
+    private val onboardingDataStore: com.acadmate.core.datastore.OnboardingDataStore
 ) : ViewModel() {
 
     private val firestore = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+    private val auth = com.google.firebase.auth.FirebaseAuth.getInstance()
     private val json = Json { ignoreUnknownKeys = true }
 
     private val _uiState = MutableStateFlow<ExamUiState>(ExamUiState.Setup)
@@ -62,13 +64,36 @@ class MockExamViewModel @Inject constructor(
     private val _availableSubjects = MutableStateFlow<List<com.acadmate.core.model.SubjectSyllabus>>(emptyList())
     val availableSubjects: StateFlow<List<com.acadmate.core.model.SubjectSyllabus>> = _availableSubjects.asStateFlow()
 
+    private val _availableQuizzes = MutableStateFlow<List<PublishedQuiz>>(emptyList())
+    val availableQuizzes: StateFlow<List<PublishedQuiz>> = _availableQuizzes.asStateFlow()
+
     private val _timeLeft = MutableStateFlow(0)
     val timeLeft: StateFlow<Int> = _timeLeft.asStateFlow()
+
+    val userRole: StateFlow<com.acadmate.core.model.UserRole?> = onboardingDataStore.selectedRole
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     private var timerJob: Job? = null
 
     init {
         loadAvailableSubjects()
+        loadPublishedQuizzes()
+    }
+
+    private fun loadPublishedQuizzes() {
+        viewModelScope.launch {
+            try {
+                firestore.collection("published_quizzes")
+                    .orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING)
+                    .addSnapshotListener { snapshot, e ->
+                        if (e != null) return@addSnapshotListener
+                        val quizzes = snapshot?.documents?.mapNotNull { doc ->
+                            doc.toObject(PublishedQuiz::class.java)?.copy(id = doc.id)
+                        } ?: emptyList()
+                        _availableQuizzes.value = quizzes
+                    }
+            } catch (e: Exception) {}
+        }
     }
 
     private fun loadAvailableSubjects() {
@@ -76,15 +101,44 @@ class MockExamViewModel @Inject constructor(
             try {
                 val snapshot = firestore.collection("syllabuses").get().await()
                 val list = snapshot.toObjects(com.acadmate.core.model.SubjectSyllabus::class.java)
-                _availableSubjects.value = list
+                _availableSubjects.value = if (list.isNotEmpty()) list 
+                                          else com.acadmate.core.model.PredefinedSyllabus.bTechCse6thSem
             } catch (e: Exception) {
-                // Fallback if firestore fetch fails
                 _availableSubjects.value = com.acadmate.core.model.PredefinedSyllabus.bTechCse6thSem
             }
         }
     }
 
-    fun generateExam(subject: String, difficulty: String, count: Int, timeLimit: Int?) {
+    fun publishQuiz(subject: String, difficulty: String, questions: List<Question>) {
+        viewModelScope.launch {
+            try {
+                val userId = auth.currentUser?.uid ?: return@launch
+                val userDoc = firestore.collection("users").document(userId).get().await()
+                val facultyName = userDoc.getString("name") ?: "Professor"
+
+                val quizData = PublishedQuiz(
+                    title = "$subject Quiz ($difficulty)",
+                    subject = subject,
+                    facultyName = facultyName,
+                    facultyId = userId,
+                    questions = questions,
+                    createdAt = System.currentTimeMillis()
+                )
+                
+                firestore.collection("published_quizzes").add(quizData).await()
+                _uiState.value = ExamUiState.Setup // Go back to setup after publishing
+            } catch (e: Exception) {
+                _uiState.value = ExamUiState.Error("Failed to publish: ${e.message}")
+            }
+        }
+    }
+
+    fun startPublishedQuiz(quiz: PublishedQuiz) {
+        _uiState.value = ExamUiState.Ongoing(quiz.questions, 0)
+        startTimer(20 * 60) // Default 20 mins for published quizzes
+    }
+
+    fun generateExam(subject: String, difficulty: String, count: Int, timeLimit: Int?, shouldPublish: Boolean = false) {
         viewModelScope.launch {
             _uiState.value = ExamUiState.Loading
             
@@ -108,20 +162,21 @@ class MockExamViewModel @Inject constructor(
                     - explanation: a brief explanation why the answer is correct
                     - topic: the specific topic or unit name from the syllabus this question relates to
                     
-                    Respond only with the JSON.
+                    Respond only with the JSON array.
                 """.trimIndent()
 
                 val response = generativeModel.generateContent(prompt)
                 val responseText = response.text?.trim() ?: throw Exception("Empty response from AI")
                 
-                // Extract JSON if AI wrapped it in markdown code blocks
-                val jsonString = if (responseText.startsWith("```json")) {
-                    responseText.substringAfter("```json").substringBeforeLast("```").trim()
-                } else if (responseText.startsWith("```")) {
-                    responseText.substringAfter("```").substringBeforeLast("```").trim()
-                } else {
-                    responseText
+                // Robust JSON extraction: Find the first '[' and last ']'
+                val startIndex = responseText.indexOf("[")
+                val endIndex = responseText.lastIndexOf("]")
+                
+                if (startIndex == -1 || endIndex == -1 || endIndex < startIndex) {
+                    throw Exception("Could not find valid JSON array in AI response")
                 }
+                
+                val jsonString = responseText.substring(startIndex, endIndex + 1)
 
                 val aiQuestions = json.decodeFromString<List<AiQuestion>>(jsonString)
                 val questions = aiQuestions.mapIndexed { i, aq ->
@@ -135,35 +190,17 @@ class MockExamViewModel @Inject constructor(
                     )
                 }
 
-                _uiState.value = ExamUiState.Ongoing(questions, 0)
-                
-                timeLimit?.let {
-                    startTimer(it * 60)
+                if (shouldPublish) {
+                    publishQuiz(subject, difficulty, questions)
+                } else {
+                    _uiState.value = ExamUiState.Ongoing(questions, 0)
+                    timeLimit?.let {
+                        startTimer(it * 60)
+                    }
                 }
             } catch (e: Exception) {
-                // Check if it's the Vertex AI API enablement error
-                if (e.message?.contains("firebasevertexai.googleapis.com") == true) {
-                    _uiState.value = ExamUiState.Error(
-                        "The Vertex AI API is not enabled. Please enable it in the Firebase Console under 'Vertex AI'."
-                    )
-                    return@launch
-                }
-
-                // Fallback to local generation if AI fails
-                val questions = List(count) { i ->
-                    Question(
-                        id = "$i",
-                        text = "Sample Question $i for $subject ($difficulty)?",
-                        options = listOf("Option A", "Option B", "Option C", "Option D"),
-                        correctIndex = (0..3).random(),
-                        explanation = "AI generation failed: ${e.message}. This is a fallback question."
-                    )
-                }
-                _uiState.value = ExamUiState.Ongoing(questions, 0)
-                
-                timeLimit?.let {
-                    startTimer(it * 60)
-                }
+                // ... fallback logic ...
+                _uiState.value = ExamUiState.Error("Generation failed: ${e.message}")
             }
         }
     }
@@ -229,33 +266,25 @@ class MockExamViewModel @Inject constructor(
     }
 
     private fun saveResultToFirestore(result: ExamResult) {
-        val userId = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: return
-        val firestore = com.google.firebase.firestore.FirebaseFirestore.getInstance()
-        
-        val examData = hashMapOf(
-            "userId" to userId,
-            "score" to result.score,
-            "total" to result.total,
-            "percentage" to (result.score.toFloat() / result.total) * 100,
-            "timestamp" to System.currentTimeMillis(),
-            "strongTopics" to result.strongTopics,
-            "weakTopics" to result.weakTopics,
-            "detailedQuestions" to result.questions.map { 
-                hashMapOf(
-                    "text" to it.text,
-                    "selectedIndex" to it.selectedIndex,
-                    "correctIndex" to it.correctIndex,
-                    "isCorrect" to (it.selectedIndex == it.correctIndex)
-                )
-            }
-        )
+        val userId = auth.currentUser?.uid ?: return
         
         viewModelScope.launch {
             try {
+                val userDoc = firestore.collection("users").document(userId).get().await()
+                val studentName = userDoc.getString("name") ?: "Student"
+
+                val examData = hashMapOf(
+                    "userId" to userId,
+                    "studentName" to studentName,
+                    "score" to result.score,
+                    "total" to result.total,
+                    "percentage" to (result.score.toFloat() / result.total) * 100,
+                    "timestamp" to System.currentTimeMillis(),
+                    "strongTopics" to result.strongTopics,
+                    "weakTopics" to result.weakTopics
+                )
                 firestore.collection("exam_results").add(examData)
-            } catch (e: Exception) {
-                // Silently fail or log
-            }
+            } catch (e: Exception) { }
         }
     }
 
@@ -265,3 +294,14 @@ class MockExamViewModel @Inject constructor(
         timerJob?.cancel()
     }
 }
+
+data class PublishedQuiz(
+    val id: String = "",
+    val title: String = "",
+    val subject: String = "",
+    val facultyName: String = "",
+    val facultyId: String = "",
+    val questions: List<Question> = emptyList(),
+    val createdAt: Long = 0
+)
+

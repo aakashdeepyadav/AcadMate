@@ -41,15 +41,42 @@ class AuthViewModel @Inject constructor(
     private val auth = FirebaseAuth.getInstance()
     private val firestore = FirebaseFirestore.getInstance()
     private var googleSignInClient: GoogleSignInClient? = null
-    private var verificationId: String? = null
-    private var currentPhoneNumber: String? = null
-    private var resendToken: PhoneAuthProvider.ForceResendingToken? = null
+    
     private var pendingEmail: String? = null
     private var pendingPass: String? = null
     private var pendingRegNo: String? = null
 
+    companion object {
+        private var sharedVerificationId: String? = null
+        private var sharedResendToken: PhoneAuthProvider.ForceResendingToken? = null
+        private var sharedCurrentPhoneNumber: String? = null
+    }
+
+    private var verificationId: String?
+        get() = sharedVerificationId.also { Log.d("AuthViewModel", "Getting verificationId: $it") }
+        set(value) { 
+            Log.d("AuthViewModel", "Setting verificationId: $value")
+            sharedVerificationId = value 
+        }
+
+    private var resendToken: PhoneAuthProvider.ForceResendingToken?
+        get() = sharedResendToken
+        set(value) { 
+            Log.d("AuthViewModel", "Setting resendToken: $value")
+            sharedResendToken = value 
+        }
+
+    private var currentPhoneNumber: String?
+        get() = sharedCurrentPhoneNumber
+        set(value) { 
+            Log.d("AuthViewModel", "Setting currentPhoneNumber: $value")
+            sharedCurrentPhoneNumber = value 
+        }
+
     private val _uiState = MutableStateFlow<AuthUiState>(AuthUiState.Idle)
     val uiState: StateFlow<AuthUiState> = _uiState
+
+    private var forcePasswordChangeUserId: String? = null
 
     val selectedRole: StateFlow<UserRole?> = onboardingDataStore.selectedRole
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
@@ -69,12 +96,14 @@ class AuthViewModel @Inject constructor(
         }
 
         override fun onCodeSent(verificationId: String, token: PhoneAuthProvider.ForceResendingToken) {
+            Log.d("AuthViewModel", "onCodeSent: $verificationId")
             this@AuthViewModel.verificationId = verificationId
             this@AuthViewModel.resendToken = token
             _uiState.value = AuthUiState.OtpSent("+91${currentPhoneNumber ?: "phone"}")
         }
 
         override fun onCodeAutoRetrievalTimeOut(verificationId: String) {
+            Log.d("AuthViewModel", "onCodeAutoRetrievalTimeOut: $verificationId")
             this@AuthViewModel.verificationId = verificationId
         }
     }
@@ -257,6 +286,7 @@ class AuthViewModel @Inject constructor(
 
     fun resetPassword(regNo: String) {
         val cleanRegNo = regNo.trim()
+        Log.d("AuthViewModel", "resetPassword: regNo=$cleanRegNo")
         if (cleanRegNo.isEmpty()) {
             _uiState.value = AuthUiState.Error("Please enter your Registration Number to reset password")
             return
@@ -265,44 +295,51 @@ class AuthViewModel @Inject constructor(
         _uiState.value = AuthUiState.Loading
         viewModelScope.launch {
             try {
-                val selectedRole = onboardingDataStore.selectedRole.first()
-                if (selectedRole == null) {
-                    _uiState.value = AuthUiState.Error("Role not selected")
+                val selectedRoleFlow = onboardingDataStore.selectedRole.first()
+                Log.d("AuthViewModel", "resetPassword: selectedRole=$selectedRoleFlow")
+                if (selectedRoleFlow == null) {
+                    _uiState.value = AuthUiState.Error("Role not selected. Please select a role first.")
                     return@launch
                 }
 
                 val userDoc = firestore.collection("users")
                     .whereEqualTo("regNo", cleanRegNo)
-                    .whereEqualTo("role", selectedRole.name)
+                    .whereEqualTo("role", selectedRoleFlow.name)
                     .get()
                     .await()
 
                 if (userDoc.isEmpty) {
+                    Log.w("AuthViewModel", "resetPassword: No user found for regNo=$cleanRegNo and role=${selectedRoleFlow.name}")
                     _uiState.value = AuthUiState.Error("No account found with this Registration Number for the selected role")
                     return@launch
                 }
 
                 val email = userDoc.documents[0].getString("email") ?: ""
+                Log.d("AuthViewModel", "resetPassword: found email=$email")
                 if (email.isEmpty()) {
                     _uiState.value = AuthUiState.Error("No email associated with this account. Contact Admin.")
                     return@launch
                 }
 
                 auth.sendPasswordResetEmail(email).await()
-                _uiState.value = AuthUiState.PasswordResetSent("Password reset link sent to your registered email.")
+                Log.d("AuthViewModel", "resetPassword: email sent successfully to $email")
+                _uiState.value = AuthUiState.PasswordResetSent("Password reset link sent to $email. Please check your inbox.")
             } catch (e: Exception) {
+                Log.e("AuthViewModel", "resetPassword: Error sending reset email", e)
                 _uiState.value = AuthUiState.Error(e.message ?: "Failed to send reset email")
             }
         }
     }
 
     fun verifyOtp(otp: String) {
+        Log.d("AuthViewModel", "verifyOtp: otp=$otp, verificationId=$verificationId")
         if (otp.length != 6 || !otp.all { it.isDigit() }) {
             _uiState.value = AuthUiState.Error("Please enter a valid 6-digit OTP")
             return
         }
 
         if (verificationId == null) {
+            Log.e("AuthViewModel", "verifyOtp: verificationId is null")
             _uiState.value = AuthUiState.Error("Verification ID not found. Please request OTP again.")
             return
         }
@@ -392,6 +429,7 @@ class AuthViewModel @Inject constructor(
 
     fun resetState() {
         _uiState.value = AuthUiState.Idle
+        forcePasswordChangeUserId = null
     }
 
     fun isUserLoggedIn(): Boolean {
@@ -402,17 +440,15 @@ class AuthViewModel @Inject constructor(
         return auth.currentUser?.uid
     }
 
-    fun signOut() {
-        viewModelScope.launch {
-            try {
-                userRepository.clearLocalData()
-                onboardingDataStore.clearAll()
-                auth.signOut()
-                googleSignInClient?.signOut()?.await()
-                resetState()
-            } catch (e: Exception) {
-                _uiState.value = AuthUiState.Error("Sign-out failed: ${e.message}")
-            }
+    suspend fun signOut() {
+        try {
+            userRepository.clearLocalData()
+            onboardingDataStore.clearAll()
+            auth.signOut()
+            googleSignInClient?.signOut()?.await()
+            resetState()
+        } catch (e: Exception) {
+            _uiState.value = AuthUiState.Error("Sign-out failed: ${e.message}")
         }
     }
 
@@ -421,117 +457,153 @@ class AuthViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
-                val user = auth.currentUser
-                if (user != null) {
+                // If there's an existing currentUser (from email/password login step), 
+                // we link it with the phone credential.
+                val currentUser = auth.currentUser
+                if (currentUser != null) {
                     try {
-                        // Link phone credential if it's first login verification
-                        user.linkWithCredential(credential).await()
-                        
-                        // Treat regNo as the authoritative document ID
-                        // We find the record by email or phone and update the 'id' field with UID
-                        // but we don't move the document.
-                        val usersByEmail = firestore.collection("users")
-                            .whereEqualTo("email", user.email ?: "")
-                            .get()
-                            .await()
-                        
-                        val adminCreatedDoc = usersByEmail.documents.firstOrNull()
-
-                        if (adminCreatedDoc != null) {
-                            firestore.collection("users").document(adminCreatedDoc.id)
-                                .update(
-                                    "id", user.uid,
-                                    "isFirstLogin", false,
-                                    "updatedAt", System.currentTimeMillis()
-                                )
-                                .await()
-                        }
+                        // Attempt to link. If already linked, this is fine.
+                        currentUser.linkWithCredential(credential).await()
                     } catch (e: Exception) {
-                        // If user is already linked to this phone, we just proceed
-                        // This happens on subsequent logins where MFA is required but already linked
-                        if (e.message?.contains("already been linked") == true || 
+                        val msg = e.message ?: ""
+                        if (msg.contains("already been linked", ignoreCase = true) || 
+                            msg.contains("provider-already-linked", ignoreCase = true) ||
                             e is com.google.firebase.auth.FirebaseAuthUserCollisionException) {
-                            Log.d("AuthViewModel", "User already linked, proceeding as verified")
+                            Log.d("AuthViewModel", "User already linked or collision, proceeding")
                         } else {
                             throw e
                         }
                     }
-                        
-                    userRepository.syncUserData(user.uid)
-                    onboardingDataStore.setOnboardingCompleted(true)
-                    _uiState.value = AuthUiState.Verified(user.uid)
+
+                    // Success! Finalize the session
+                    finalizeUserSession(currentUser)
                 } else {
-                    // Try to create the user with email and password first if pendingEmail is set
-                    var createdUser = auth.currentUser
-                    if (pendingEmail != null && pendingPass != null && createdUser == null) {
+                    // Institutional Login Case (Admin created user) - NO PREVIOUS SESSION
+                    if (pendingEmail != null && pendingPass != null) {
                         try {
-                            val authResult = auth.createUserWithEmailAndPassword(pendingEmail!!, pendingPass!!).await()
-                            createdUser = authResult.user
-                        } catch (e: Exception) {
-                            // If user already exists, sign them in
-                            if (e is com.google.firebase.auth.FirebaseAuthUserCollisionException || e.message?.contains("email address is already in use") == true) {
-                                val authResult = auth.signInWithEmailAndPassword(pendingEmail!!, pendingPass!!).await()
-                                createdUser = authResult.user
-                            } else {
-                                throw e
-                            }
-                        }
-                    }
+                            // 1. First, we MUST verify the credential by signing in with it directly
+                            // This confirms the phone belongs to the user
+                            val phoneAuthResult = auth.signInWithCredential(credential).await()
+                            val phoneUser = phoneAuthResult.user ?: throw Exception("Failed to sign in with phone")
 
-                    if (createdUser != null) {
-                        // Link the phone credential to the newly created email/password user
-                        try {
-                            createdUser.linkWithCredential(credential).await()
-                        } catch (e: Exception) {
-                            if (e.message?.contains("already been linked") == true || 
-                                e is com.google.firebase.auth.FirebaseAuthUserCollisionException) {
-                                Log.d("AuthViewModel", "User already linked to phone, proceeding")
-                            } else {
-                                throw e
-                            }
-                        }
-                        
-                        // Update the Firestore document
-                        if (pendingRegNo != null) {
-                            val userDocQuery = firestore.collection("users")
-                                .whereEqualTo("regNo", pendingRegNo)
-                                .get()
-                                .await()
+                            // 2. Now link the email/password identity to this verified phone user
+                            // or create the email account and link it. 
+                            val emailCredential = com.google.firebase.auth.EmailAuthProvider.getCredential(pendingEmail!!, pendingPass!!)
                             
-                            val adminCreatedDoc = userDocQuery.documents.firstOrNull()
-                            if (adminCreatedDoc != null) {
-                                firestore.collection("users").document(adminCreatedDoc.id)
-                                    .update(
-                                        "id", createdUser.uid,
-                                        "isFirstLogin", false,
-                                        "updatedAt", System.currentTimeMillis()
-                                    )
-                                    .await()
+                            try {
+                                phoneUser.linkWithCredential(emailCredential).await()
+                            } catch (linkError: Exception) {
+                                val msg = linkError.message ?: ""
+                                if (msg.contains("already been linked", ignoreCase = true) || 
+                                    msg.contains("provider-already-linked", ignoreCase = true) ||
+                                    linkError is com.google.firebase.auth.FirebaseAuthUserCollisionException) {
+                                    Log.d("AuthViewModel", "Email already linked or collision, proceeding")
+                                } else {
+                                    throw linkError
+                                }
                             }
+                            
+                            finalizeUserSession(phoneUser)
+                        } catch (e: Exception) {
+                            auth.signOut() // CLEANUP: Ensure no half-logged-in state
+                            throw e
                         }
-
-                        userRepository.syncUserData(createdUser.uid)
-                        onboardingDataStore.setOnboardingCompleted(true)
-                        _uiState.value = AuthUiState.Verified(createdUser.uid)
-                        
-                        // Clear pending data
-                        pendingEmail = null
-                        pendingPass = null
-                        pendingRegNo = null
                     } else {
-                        // Fallback to just phone auth if no pending data
+                        // Standard Phone-only Login
                         val result = auth.signInWithCredential(credential).await()
                         if (result.user != null) {
-                            userRepository.syncUserData(result.user!!.uid)
-                            onboardingDataStore.setOnboardingCompleted(true)
-                            _uiState.value = AuthUiState.Verified(result.user!!.uid)
+                            finalizeUserSession(result.user!!)
                         } else {
                             _uiState.value = AuthUiState.Error("Sign-in failed")
                         }
                     }
                 }
             } catch (e: Exception) {
+                auth.signOut() // IMPORTANT: Clear session on any failure
                 _uiState.value = AuthUiState.Error("Verification error: ${e.message}")
+            }
+        }
+    }
+
+    private suspend fun finalizeUserSession(user: com.google.firebase.auth.FirebaseUser) {
+        // Treat regNo as the authoritative document ID or find by email
+        val userDocQuery = if (pendingRegNo != null) {
+            firestore.collection("users").whereEqualTo("regNo", pendingRegNo).get().await()
+        } else {
+            firestore.collection("users").whereEqualTo("email", user.email ?: "").get().await()
+        }
+        
+        val adminCreatedDoc = userDocQuery.documents.firstOrNull()
+
+        if (adminCreatedDoc != null) {
+            val isFirstLogin = adminCreatedDoc.getBoolean("isFirstLogin") ?: false
+            
+            firestore.collection("users").document(adminCreatedDoc.id)
+                .update(
+                    "id", user.uid,
+                    "updatedAt", System.currentTimeMillis()
+                )
+                .await()
+
+            if (isFirstLogin) {
+                _uiState.value = AuthUiState.ForcePasswordChange(user.uid)
+                // Clear pending data
+                pendingEmail = null
+                pendingPass = null
+                pendingRegNo = null
+                return
+            }
+        }
+
+        userRepository.syncUserData(user.uid)
+        onboardingDataStore.setOnboardingCompleted(true)
+        _uiState.value = AuthUiState.Verified(user.uid)
+        
+        // Clear pending data
+        pendingEmail = null
+        pendingPass = null
+        pendingRegNo = null
+    }
+
+    fun updateInstitutionalPassword(newPass: String) {
+        if (!ValidationUtils.isStrongPassword(newPass)) {
+            _uiState.value = AuthUiState.Error(ValidationUtils.getPasswordStrengthErrorMessage())
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.value = AuthUiState.Loading
+            try {
+                val user = auth.currentUser
+                if (user != null) {
+                    // 1. Update Firebase Auth Password
+                    user.updatePassword(newPass).await()
+                    
+                    // 2. Update Firestore and mark isFirstLogin = false
+                    val userDocQuery = firestore.collection("users")
+                        .whereEqualTo("id", user.uid)
+                        .get()
+                        .await()
+                    
+                    val doc = userDocQuery.documents.firstOrNull()
+                    if (doc != null) {
+                        firestore.collection("users").document(doc.id)
+                            .update(
+                                "password", newPass, // Update to new password
+                                "isFirstLogin", false, // SET TO FALSE NOW
+                                "updatedAt", System.currentTimeMillis()
+                            ).await()
+                    }
+
+                    // 3. Instead of signing out, finalize the session
+                    userRepository.syncUserData(user.uid)
+                    onboardingDataStore.setOnboardingCompleted(true)
+                    _uiState.value = AuthUiState.Verified(user.uid)
+                } else {
+                    _uiState.value = AuthUiState.Error("Session expired. Please start over.")
+                }
+            } catch (e: Exception) {
+                _uiState.value = AuthUiState.Error("Failed to update password: ${e.message}")
             }
         }
     }

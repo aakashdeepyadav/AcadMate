@@ -36,6 +36,7 @@ android {
 }
 
 dependencies {
+    implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
@@ -71,5 +72,6 @@ dependencies {
     ksp(libs.com.google.dagger.hilt.compiler)
     
     implementation(project(":core"))
+    implementation(project(":attendance"))
     implementation(project(":designsystem"))
 }

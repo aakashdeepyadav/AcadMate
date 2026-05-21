@@ -1,16 +1,40 @@
 package com.acadmate.core.db
 
+import com.acadmate.core.model.SubjectSyllabus
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class SyllabusRepository @Inject constructor(
-    private val syllabusGapDao: SyllabusGapDao
+    private val syllabusGapDao: SyllabusGapDao,
+    private val syllabusDao: SyllabusDao
 ) {
     private val firestore = FirebaseFirestore.getInstance()
+
+    fun getAllSyllabuses(): Flow<List<SubjectSyllabus>> {
+        return syllabusDao.getAllSyllabuses().map { entities ->
+            entities.map { it.toModel() }
+        }
+    }
+
+    suspend fun syncSyllabuses() {
+        try {
+            val snapshot = firestore.collection("syllabuses").get().await()
+            val remoteItems = snapshot.toObjects(SubjectSyllabus::class.java)
+            
+            if (remoteItems.isNotEmpty()) {
+                val entities = remoteItems.map { it.toEntity() }
+                syllabusDao.clearAllSyllabuses()
+                syllabusDao.insertSyllabuses(entities)
+            }
+        } catch (e: Exception) {
+            // Offline
+        }
+    }
 
     fun getGapsForSubject(subjectId: String): Flow<List<SyllabusGapEntity>> {
         return syllabusGapDao.getGapsForSubject(subjectId)
@@ -40,7 +64,7 @@ class SyllabusRepository @Inject constructor(
                 syllabusGapDao.insertGaps(remoteGaps)
             }
         } catch (e: Exception) {
-            // Offline fallback or error handling
+            // Offline fallback
         }
     }
 
@@ -66,7 +90,25 @@ class SyllabusRepository @Inject constructor(
             }
             batch.commit().await()
         } catch (e: Exception) {
-            // Handle sync failure (could retry later)
+            // Handle sync failure
         }
     }
+
+    private fun SubjectSyllabus.toEntity() = SyllabusEntity(
+        subjectCode = subjectCode,
+        subjectName = subjectName,
+        description = description,
+        credits = credits,
+        ltp = ltp,
+        units = units
+    )
+
+    private fun SyllabusEntity.toModel() = SubjectSyllabus(
+        subjectCode = subjectCode,
+        subjectName = subjectName,
+        description = description,
+        credits = credits,
+        ltp = ltp,
+        units = units
+    )
 }

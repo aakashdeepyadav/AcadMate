@@ -306,21 +306,48 @@ fun GreetingSection(name: String) {
         in 12..16 -> "Good Afternoon"
         else -> "Good Evening"
     }
+    val icon = when (hour) {
+        in 0..11 -> Icons.Default.LightMode
+        in 12..16 -> Icons.Default.WbCloudy
+        else -> Icons.Default.NightsStay
+    }
 
-    Column(modifier = Modifier.padding(horizontal = LocalSpacing.current.md)) {
-        Text(
-            text = "$greeting,",
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text(
-            text = if (name.isNotEmpty()) name.split(" ").first() else "Scholar",
-            style = MaterialTheme.typography.headlineLarge.copy(
-                fontWeight = FontWeight.Black,
-                letterSpacing = (-1).sp
-            ),
-            color = MaterialTheme.colorScheme.onSurface
-        )
+    Row(
+        modifier = Modifier.padding(horizontal = LocalSpacing.current.md).fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "$greeting,",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = if (name.isNotEmpty()) name.split(" ").first() else "Scholar",
+                style = MaterialTheme.typography.headlineLarge.copy(
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = (-1.5).sp
+                ),
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+        
+        Surface(
+            modifier = Modifier.size(56.dp),
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+        }
     }
 }
 
@@ -332,39 +359,55 @@ fun EnhancedAttendanceHero(
     timeLeft: String,
     onMarkAttendance: () -> Unit
 ) {
+    val infiniteTransition = rememberInfiniteTransition(label = "heroPulse")
+    val pulse by infiniteTransition.animateFloat(
+        initialValue = 0.98f,
+        targetValue = 1.02f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2000, easing = LinearOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse"
+    )
+
     AcadMateCard(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = LocalSpacing.current.md),
+            .padding(horizontal = LocalSpacing.current.md)
+            .graphicsLayer(scaleX = if (currentClass != null) pulse else 1f, scaleY = if (currentClass != null) pulse else 1f),
         variant = CardVariant.Gradient,
-        gradientColors = listOf(SoftBlue, Color(0xFF3B82F6)),
-        cornerRadius = 24.dp
+        gradientColors = if (currentClass != null) listOf(SoftBlue, AccentPurple) else listOf(SoftBlue, Color(0xFF3B82F6)),
+        cornerRadius = 28.dp
     ) {
         Box(modifier = Modifier.fillMaxWidth()) {
             // Background Pattern Decoration
             Icon(
-                Icons.Default.Waves,
+                Icons.Default.AutoAwesome,
                 contentDescription = null,
                 modifier = Modifier
-                    .size(150.dp)
+                    .size(180.dp)
                     .align(Alignment.BottomEnd)
-                    .offset(x = 40.dp, y = 40.dp)
-                    .alpha(0.1f),
+                    .offset(x = 50.dp, y = 50.dp)
+                    .alpha(0.08f),
                 tint = Color.White
             )
 
-            Column(modifier = Modifier.padding(20.dp)) {
+            Column(modifier = Modifier.padding(24.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.Top
                 ) {
                     Column {
                         Text(
-                            text = "Attendance Integrity",
-                            style = MaterialTheme.typography.labelMedium,
+                            text = "ACADEMIC STANDING",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.sp
+                            ),
                             color = Color.White.copy(alpha = 0.8f)
                         )
+                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = "${(percentage * 100).toInt()}%",
                             style = MaterialTheme.typography.displayLarge.copy(
@@ -379,46 +422,80 @@ fun EnhancedAttendanceHero(
                     Box(contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(
                             progress = { percentage },
-                            modifier = Modifier.size(80.dp),
+                            modifier = Modifier.size(90.dp),
                             color = Color.White,
-                            strokeWidth = 8.dp,
+                            strokeWidth = 10.dp,
                             trackColor = Color.White.copy(0.2f),
                             strokeCap = androidx.compose.ui.graphics.StrokeCap.Round
                         )
-                        Text(
-                            "Goal",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                "GOAL",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White.copy(alpha = 0.7f),
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                "75%",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = Color.White,
+                                fontWeight = FontWeight.Black
+                            )
+                        }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(24.dp))
                 
                 Surface(
-                    color = Color.White.copy(0.15f),
-                    shape = RoundedCornerShape(12.dp)
+                    color = Color.White.copy(0.12f),
+                    shape = RoundedCornerShape(16.dp),
+                    border = BorderStroke(1.dp, Color.White.copy(0.1f))
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Default.Event, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        
-                        val displayText = when {
-                            currentClass != null -> "Ongoing: $currentClass"
-                            nextClass != null -> "Next Class: $nextClass in $timeLeft"
-                            else -> "No more classes today"
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .background(Color.White.copy(0.2f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                if (currentClass != null) Icons.Default.PlayCircle else Icons.Default.Event,
+                                contentDescription = null, 
+                                tint = Color.White, 
+                                modifier = Modifier.size(18.dp)
+                            )
                         }
+                        Spacer(modifier = Modifier.width(12.dp))
                         
-                        Text(
-                            text = displayText,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color.White,
-                            fontWeight = FontWeight.Medium
-                        )
+                        Column {
+                            val statusTitle = when {
+                                currentClass != null -> "LIVE SESSION"
+                                nextClass != null -> "UPCOMING CLASS"
+                                else -> "SCHEDULE CLEAR"
+                            }
+                            Text(
+                                text = statusTitle,
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = Color.White.copy(alpha = 0.7f)
+                            )
+                            val displayText = when {
+                                currentClass != null -> currentClass
+                                nextClass != null -> "$nextClass in $timeLeft"
+                                else -> "No more classes today"
+                            }
+                            Text(
+                                text = displayText,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color.White,
+                                fontWeight = FontWeight.ExtraBold,
+                                maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                            )
+                        }
                     }
                 }
 
@@ -426,18 +503,24 @@ fun EnhancedAttendanceHero(
 
                 Button(
                     onClick = onMarkAttendance,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Color.White),
-                    shape = RoundedCornerShape(14.dp),
-                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp),
+                    shape = RoundedCornerShape(18.dp),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp),
                     enabled = currentClass != null
                 ) {
-                    Icon(Icons.Default.Fingerprint, contentDescription = null, tint = if (currentClass != null) SoftBlue else Color.Gray, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Icon(
+                        Icons.Default.Fingerprint, 
+                        contentDescription = null, 
+                        tint = if (currentClass != null) SoftBlue else Color.Gray, 
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
                     Text(
-                        if (currentClass != null) "Verify My Attendance" else "Waiting for Session", 
-                        fontWeight = FontWeight.ExtraBold, 
-                        color = if (currentClass != null) SoftBlue else Color.Gray
+                        if (currentClass != null) "VERIFY PRESENCE" else "WAITING FOR BEACON", 
+                        fontWeight = FontWeight.Black, 
+                        color = if (currentClass != null) SoftBlue else Color.Gray,
+                        letterSpacing = 0.5.sp
                     )
                 }
             }

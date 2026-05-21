@@ -34,6 +34,9 @@ class OnboardingDataStore @Inject constructor(
     private val alarmVibrationEnabledKey = booleanPreferencesKey("alarm_vibration_enabled")
     private val alarmVolumeKey = stringPreferencesKey("alarm_volume")
     private val alarmMinutesBeforeKey = stringPreferencesKey("alarm_minutes_before")
+    private val sessionReportsEnabledKey = booleanPreferencesKey("session_reports_enabled")
+    private val securityAnomaliesEnabledKey = booleanPreferencesKey("security_anomalies_enabled")
+    private val leaveRequestsEnabledKey = booleanPreferencesKey("leave_requests_enabled")
 
     val selectedRole: Flow<UserRole?> = context.dataStore.data.map { preferences ->
         preferences[selectedRoleKey]?.let { UserRole.fromString(it) }
@@ -97,10 +100,26 @@ class OnboardingDataStore @Inject constructor(
         preferences[alarmMinutesBeforeKey]?.toIntOrNull() ?: 60
     }
 
+    val sessionReportsEnabled: Flow<Boolean> = context.dataStore.data.map { it[sessionReportsEnabledKey] ?: true }
+    val securityAnomaliesEnabled: Flow<Boolean> = context.dataStore.data.map { it[securityAnomaliesEnabledKey] ?: true }
+    val leaveRequestsEnabled: Flow<Boolean> = context.dataStore.data.map { it[leaveRequestsEnabledKey] ?: true }
+
     suspend fun setAutoAlarmsEnabled(enabled: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[autoAlarmsEnabledKey] = enabled
         }
+    }
+
+    suspend fun setSessionReportsEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[sessionReportsEnabledKey] = enabled }
+    }
+
+    suspend fun setSecurityAnomaliesEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[securityAnomaliesEnabledKey] = enabled }
+    }
+
+    suspend fun setLeaveRequestsEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[leaveRequestsEnabledKey] = enabled }
     }
 
     suspend fun setAttendanceAlertsEnabled(enabled: Boolean) {

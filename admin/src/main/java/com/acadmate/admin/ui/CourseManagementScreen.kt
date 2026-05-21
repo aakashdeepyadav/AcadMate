@@ -77,6 +77,18 @@ class AdminCourseViewModel : ViewModel() {
         }
     }
 
+    private suspend fun logAdminAction(title: String, type: com.acadmate.core.model.ActionType, description: String) {
+        try {
+            val actionData = hashMapOf(
+                "title" to title,
+                "timestamp" to System.currentTimeMillis(),
+                "type" to type.name,
+                "description" to description
+            )
+            firestore.collection("admin_logs").add(actionData).await()
+        } catch (e: Exception) {}
+    }
+
     fun addSubject(name: String, code: String, dept: String) {
         viewModelScope.launch {
             try {
@@ -84,6 +96,7 @@ class AdminCourseViewModel : ViewModel() {
                 val newSubject = Subject(id, name, code, dept)
                 firestore.collection("subjects").document(id).set(newSubject).await()
                 _subjects.add(newSubject)
+                logAdminAction("Master Subject Added", com.acadmate.core.model.ActionType.COURSE_ADDED, "Subject $name ($code) added to repository.")
             } catch (e: Exception) {}
         }
     }
@@ -127,6 +140,7 @@ class AdminCourseViewModel : ViewModel() {
                 val newCourse = Course(id, name, code, dept, credits, faculty)
                 firestore.collection("courses").document(id).set(newCourse).await()
                 _courses.add(newCourse)
+                logAdminAction("Course Instance Launched", com.acadmate.core.model.ActionType.COURSE_ADDED, "$name ($code) assigned to ${faculty ?: "TBA"}")
             } catch (e: Exception) {
                 // Handle error
             }
@@ -141,6 +155,7 @@ class AdminCourseViewModel : ViewModel() {
                 if (index != -1) {
                     _courses[index] = course
                 }
+                logAdminAction("Course Updated", com.acadmate.core.model.ActionType.COURSE_ADDED, "Course ${course.name} configurations modified.")
             } catch (e: Exception) {
                 // Handle error
             }
@@ -152,6 +167,7 @@ class AdminCourseViewModel : ViewModel() {
             try {
                 firestore.collection("courses").document(courseId).delete().await()
                 _courses.removeAll { it.id == courseId }
+                logAdminAction("Course Deleted", com.acadmate.core.model.ActionType.SYSTEM_ALERT, "Course ID $courseId removed from active catalog.")
             } catch (e: Exception) {
                 // Handle error
             }

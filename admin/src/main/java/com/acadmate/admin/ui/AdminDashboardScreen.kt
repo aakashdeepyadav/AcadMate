@@ -178,18 +178,18 @@ fun AdminDashboardScreen(
                             horizontalArrangement = Arrangement.spacedBy(LocalSpacing.current.md)
                         ) {
                             StatCard(
-                                title = "Avg. Attendance",
-                                count = "${state.avgAttendance}%",
-                                icon = Icons.Default.BarChart,
+                                title = "Total Courses",
+                                count = state.totalCourses.toString(),
+                                icon = Icons.Default.LibraryBooks,
                                 color = Color(0xFFF5A623),
                                 modifier = Modifier.weight(1f)
                             )
                             StatCard(
                                 title = if (state.pendingApprovals > 0) "Security Alerts" else "System Health",
-                                count = if (state.pendingApprovals > 0) "${state.pendingApprovals}" else "Normal",
+                                count = if (state.pendingApprovals > 0) "${state.pendingApprovals}" else "Healthy",
                                 icon = if (state.pendingApprovals > 0) Icons.Default.GppBad else Icons.Default.Dns,
-                                color = if (state.pendingApprovals > 0) MaterialTheme.colorScheme.error else Color(0xFF6366F1),
-                                trend = if (state.pendingApprovals > 0) "Immediate Attention" else "99.9% Uptime",
+                                color = if (state.pendingApprovals > 0) MaterialTheme.colorScheme.error else Color(0xFF10B981),
+                                trend = if (state.pendingApprovals > 0) "Anomalies Detected" else "99.9% Uptime",
                                 modifier = Modifier.weight(1f)
                             )
                         }
@@ -346,10 +346,11 @@ fun StatCard(
 ) {
     AcadMateCard(
         modifier = modifier,
-        variant = CardVariant.Glass
+        variant = CardVariant.Glass,
+        cornerRadius = 20.dp
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
             horizontalAlignment = Alignment.Start
         ) {
             Row(
@@ -357,38 +358,48 @@ fun StatCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Surface(
-                    modifier = Modifier.size(32.dp),
-                    shape = RoundedCornerShape(8.dp),
-                    color = color.copy(alpha = 0.15f)
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .background(color.copy(alpha = 0.15f), RoundedCornerShape(12.dp)),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(18.dp))
-                    }
+                    Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(22.dp))
                 }
                 
                 if (trend != null) {
-                    Text(
-                        text = trend,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (trend.contains("↑") || trend.contains("+")) Color(0xFF10B981) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                        fontWeight = FontWeight.Bold
-                    )
+                    Surface(
+                        color = if (trend.contains("Anomalies") || trend.contains("Alert")) 
+                            MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f) 
+                            else Color(0xFF10B981).copy(alpha = 0.1f),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text(
+                            text = trend,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (trend.contains("Anomalies") || trend.contains("Alert")) 
+                                MaterialTheme.colorScheme.error 
+                                else Color(0xFF10B981),
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(16.dp))
             Text(
                 text = count, 
-                style = MaterialTheme.typography.headlineMedium.copy(
+                style = MaterialTheme.typography.displaySmall.copy(
                     fontWeight = FontWeight.Black,
-                    letterSpacing = (-1).sp
-                )
+                    letterSpacing = (-1.5).sp
+                ),
+                color = MaterialTheme.colorScheme.onSurface
             )
             Text(
                 text = title, 
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontWeight = FontWeight.Medium
+                fontWeight = FontWeight.SemiBold
             )
         }
     }
@@ -396,36 +407,37 @@ fun StatCard(
 
 @Composable
 fun ActionItem(action: AdminAction) {
+    val (icon, iconColor) = when(action.type) {
+        ActionType.USER_CREATED -> Icons.Default.PersonAdd to Color(0xFF00B894)
+        ActionType.INSTITUTION_UPDATED -> Icons.Default.AutoAwesome to Color(0xFF6C5CE7)
+        ActionType.ANNOUNCEMENT_POSTED -> Icons.Default.Campaign to Color(0xFFE17055)
+        ActionType.COURSE_ADDED -> Icons.Default.LibraryAdd to Color(0xFF0984E3)
+        ActionType.ATTENDANCE_ANALYTICS_GENERATED -> Icons.Default.Insights to Color(0xFFF1C40F)
+        ActionType.SYSTEM_ALERT -> Icons.Default.ReportProblem to Color(0xFFD63031)
+    }
+
     AcadMateCard(
         modifier = Modifier.fillMaxWidth(),
-        variant = CardVariant.Flat
+        variant = CardVariant.Flat,
+        backgroundColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
+        cornerRadius = 16.dp,
+        contentPadding = 12.dp
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 4.dp),
-            verticalAlignment = Alignment.Top
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            val (icon, iconColor) = when(action.type) {
-                ActionType.USER_CREATED -> Icons.Default.PersonAdd to Color(0xFF00B894)
-                ActionType.INSTITUTION_UPDATED -> Icons.Default.Business to Color(0xFF0984E3)
-                ActionType.ANNOUNCEMENT_POSTED -> Icons.Default.Campaign to Color(0xFFE17055)
-                ActionType.COURSE_ADDED -> Icons.Default.LibraryAdd to Color(0xFF6C5CE7)
-                ActionType.ATTENDANCE_ANALYTICS_GENERATED -> Icons.Default.Insights to Color(0xFFF1C40F)
-                ActionType.SYSTEM_ALERT -> Icons.Default.ReportProblem to Color(0xFFD63031)
-            }
-
             Box(
                 modifier = Modifier
-                    .size(42.dp)
-                    .clip(RoundedCornerShape(12.dp))
+                    .size(48.dp)
+                    .clip(CircleShape)
                     .background(iconColor.copy(alpha = 0.1f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    modifier = Modifier.size(22.dp),
+                    modifier = Modifier.size(24.dp),
                     tint = iconColor
                 )
             }
@@ -433,31 +445,30 @@ fun ActionItem(action: AdminAction) {
             Spacer(modifier = Modifier.width(16.dp))
             
             Column(modifier = Modifier.weight(1f)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = action.title, 
-                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold)
-                    )
-                    Text(
-                        text = java.text.SimpleDateFormat("hh:mm a", java.util.Locale.getDefault())
-                            .format(java.util.Date(action.timestamp)),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                    )
-                }
+                Text(
+                    text = action.title, 
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
                 if (action.description.isNotEmpty()) {
                     Text(
                         text = action.description,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        lineHeight = 16.sp
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                     )
                 }
             }
+            
+            Text(
+                text = java.text.SimpleDateFormat("hh:mm a", java.util.Locale.getDefault())
+                    .format(java.util.Date(action.timestamp)),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                modifier = Modifier.padding(start = 8.dp)
+            )
         }
     }
 }

@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.hilt)
     alias(libs.plugins.kotlin.ksp)
+    kotlin("plugin.serialization")
 }
 
 android {
@@ -41,6 +42,9 @@ dependencies {
 
     // DataStore
     implementation(libs.androidx.datastore.preferences)
+
+    // Serialization
+    implementation(libs.kotlinx.serialization.json)
 
     // Firebase dependencies
     implementation(platform(libs.firebase.bom))

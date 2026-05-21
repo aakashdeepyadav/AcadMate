@@ -1,10 +1,17 @@
 package com.acadmate.core.db
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import java.time.LocalDateTime
 
-@Entity(tableName = "attendance_records")
+@Entity(
+    tableName = "attendance_records",
+    indices = [
+        Index(value = ["userId"]),
+        Index(value = ["timestamp"])
+    ]
+)
 data class AttendanceEntity(
     @PrimaryKey val id: String,
     val userId: String,

@@ -52,6 +52,18 @@ class SyllabusManagementViewModel @Inject constructor() : ViewModel() {
         }
     }
     
+    private suspend fun logAdminAction(title: String, type: com.acadmate.core.model.ActionType, description: String) {
+        try {
+            val actionData = hashMapOf(
+                "title" to title,
+                "timestamp" to System.currentTimeMillis(),
+                "type" to type.name,
+                "description" to description
+            )
+            firestore.collection("admin_logs").add(actionData).await()
+        } catch (e: Exception) {}
+    }
+
     fun publishSyllabus(
         subjectCode: String,
         subjectName: String,
@@ -82,6 +94,8 @@ class SyllabusManagementViewModel @Inject constructor() : ViewModel() {
                     .document(subjectCode)
                     .set(syllabus)
                     .await()
+                
+                logAdminAction("Syllabus Published", com.acadmate.core.model.ActionType.INSTITUTION_UPDATED, "Curriculum for $subjectName ($subjectCode) was updated.")
                     
                 _uiState.value = SyllabusUiState.Success
             } catch (e: Exception) {

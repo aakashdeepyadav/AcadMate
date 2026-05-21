@@ -1,5 +1,8 @@
 package com.acadmate.core.model
 
+import kotlinx.serialization.Serializable
+
+@Serializable
 data class SubjectSyllabus(
     val subjectCode: String = "",
     val subjectName: String = "",
@@ -9,6 +12,7 @@ data class SubjectSyllabus(
     val units: List<SyllabusUnit> = emptyList()
 )
 
+@Serializable
 data class SyllabusUnit(
     val title: String = "",
     val topics: List<String> = emptyList()

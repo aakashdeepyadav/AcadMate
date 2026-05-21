@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import javax.inject.Inject
 import java.time.LocalDateTime
 import java.time.ZoneOffset
@@ -36,7 +37,9 @@ data class FacultyAttendanceUiState(
     val isSessionActive: Boolean = false,
     val sessionStartTime: Long? = null,
     val assignedCourses: List<String> = emptyList(),
-    val error: String? = null
+    val error: String? = null,
+    val isQrMode: Boolean = false,
+    val currentQrToken: String? = null
 )
 
 @HiltViewModel
@@ -49,12 +52,41 @@ class FacultyAttendanceViewModel @Inject constructor(
     private val firestore = FirebaseFirestore.getInstance()
     private val _uiState = MutableStateFlow(FacultyAttendanceUiState())
     val uiState: StateFlow<FacultyAttendanceUiState> = _uiState.asStateFlow()
+    
+    private var qrJob: kotlinx.coroutines.Job? = null
+
+    fun toggleQrMode() {
+        val newMode = !_uiState.value.isQrMode
+        _uiState.value = _uiState.value.copy(isQrMode = newMode)
+        if (newMode && _uiState.value.isSessionActive) {
+            startQrRotation()
+        } else {
+            qrJob?.cancel()
+        }
+    }
+
+    private fun startQrRotation() {
+        qrJob?.cancel()
+        qrJob = viewModelScope.launch {
+            val classId = _uiState.value.className
+            while (isActive && _uiState.value.isSessionActive && _uiState.value.isQrMode) {
+                val newToken = "QR_${classId}_${System.currentTimeMillis() / 10000}" // Updates every 10s
+                _uiState.value = _uiState.value.copy(currentQrToken = newToken)
+                
+                // Update in Firestore for student verification
+                firestore.collection("active_sessions").document(classId)
+                    .update("dynamicQrToken", newToken)
+                
+                delay(10000)
+            }
+        }
+    }
 
     fun startAttendanceSession(classId: String) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
             
-            // 1. Verify if class is actually scheduled for this faculty today
+            // ... verification logic ...
             val calendar = java.util.Calendar.getInstance()
             val dayOfWeek = when(calendar.get(java.util.Calendar.DAY_OF_WEEK)) {
                 java.util.Calendar.MONDAY -> 1
@@ -68,6 +100,7 @@ class FacultyAttendanceViewModel @Inject constructor(
             }
 
             val todaySchedule = timetableRepository.getTimetableForDaySync(dayOfWeek)
+            val nowTime = String.format(java.util.Locale.getDefault(), "%02d:%02d", calendar.get(java.util.Calendar.HOUR_OF_DAY), calendar.get(java.util.Calendar.MINUTE))
             
             // More robust name retrieval
             val repoUser = userRepository.getCurrentUser().first()
@@ -78,7 +111,7 @@ class FacultyAttendanceViewModel @Inject constructor(
             
             val currentFacultyName = repoUser?.name ?: firestoreUser?.name ?: com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.displayName ?: ""
             
-            val isScheduled = todaySchedule.any { item ->
+            val scheduledClass = todaySchedule.find { item ->
                 // Flexible matching for ID or Subject names
                 val idMatch = item.id == classId || 
                              item.subject.contains(classId, ignoreCase = true) || 
@@ -92,22 +125,22 @@ class FacultyAttendanceViewModel @Inject constructor(
                 idMatch && (nameMatch || item.faculty.isBlank() || item.faculty == "TBA" || item.faculty == "Not Assigned")
             }
 
-            // Fallback: If it's a general request, allow if they have ANY class today
-            val canStartGeneral = (classId == "General" || classId.isBlank()) && todaySchedule.any { 
-                currentFacultyName.isNotBlank() && (
-                    it.faculty.contains(currentFacultyName, ignoreCase = true) || 
-                    currentFacultyName.contains(it.faculty, ignoreCase = true)
-                )
-            }
+            val isWithinPeriod = scheduledClass?.let { 
+                nowTime >= it.startTime && nowTime <= it.endTime 
+            } ?: false
 
-            if (!isScheduled && !canStartGeneral) {
-                val timetableFaculty = todaySchedule.find { 
-                    it.id == classId || it.subject.contains(classId, ignoreCase = true) 
-                }?.faculty ?: "Unknown"
-                
+            if (scheduledClass == null) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    error = "Access Denied: Timetable mismatch. \nProfile: '$currentFacultyName'\nTimetable says: '$timetableFaculty'\nPlease ensure your name in Course Management matches your profile."
+                    error = "Access Denied: You are not assigned to $classId today."
+                )
+                return@launch
+            }
+
+            if (!isWithinPeriod && classId != "General") {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    error = "Timing Error: This class is scheduled for ${scheduledClass.startTime} - ${scheduledClass.endTime}. It is currently $nowTime."
                 )
                 return@launch
             }
@@ -125,7 +158,8 @@ class FacultyAttendanceViewModel @Inject constructor(
             val sessionData = hashMapOf(
                 "classId" to classId,
                 "startTime" to startTime,
-                "facultyId" to (com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: "unknown"),
+                "facultyId" to currentUid,
+                "facultyName" to currentFacultyName,
                 "status" to "ACTIVE"
             )
             firestore.collection("active_sessions").document(classId).set(sessionData).await()
@@ -133,6 +167,10 @@ class FacultyAttendanceViewModel @Inject constructor(
             // Start playing Acoustic Token (18.5kHz)
             acousticGenerator.playToken("ATT_SESSION_$classId")
             
+            if (_uiState.value.isQrMode) {
+                startQrRotation()
+            }
+
             // Automatically stop after 10 minutes
             delay(10 * 60 * 1000L)
             if (_uiState.value.isSessionActive) {
@@ -143,7 +181,8 @@ class FacultyAttendanceViewModel @Inject constructor(
 
     fun stopAttendanceSession() {
         val classId = _uiState.value.className
-        _uiState.value = _uiState.value.copy(isSessionActive = false, sessionStartTime = null)
+        qrJob?.cancel()
+        _uiState.value = _uiState.value.copy(isSessionActive = false, sessionStartTime = null, currentQrToken = null)
         acousticGenerator.stop()
         
         // Remove from Firestore

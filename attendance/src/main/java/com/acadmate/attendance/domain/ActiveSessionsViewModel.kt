@@ -13,6 +13,7 @@ import javax.inject.Inject
 data class ActiveSessionRecord(
     val classId: String,
     val facultyId: String,
+    val facultyName: String,
     val startTime: Long,
     val status: String
 )
@@ -53,7 +54,8 @@ class ActiveSessionsViewModel @Inject constructor() : ViewModel() {
                             try {
                                 ActiveSessionRecord(
                                     classId = doc.getString("classId") ?: doc.id,
-                                    facultyId = doc.getString("facultyId") ?: "Unknown Faculty",
+                                    facultyId = doc.getString("facultyId") ?: "Unknown",
+                                    facultyName = doc.getString("facultyName") ?: "Professor",
                                     startTime = doc.getLong("startTime") ?: 0L,
                                     status = doc.getString("status") ?: "UNKNOWN"
                                 )

@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.room.Room
 import com.google.ai.client.generativeai.GenerativeModel
 import com.acadmate.ai.BuildConfig
-import com.google.ai.client.generativeai.type.generationConfig
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -35,8 +34,8 @@ object AiTutorModule {
     @Singleton
     fun provideGenerativeModel(): GenerativeModel {
         return GenerativeModel(
-            modelName = "gemini-3-flash-preview",
-            apiKey = BuildConfig.GEMINI_API_KEY
+            modelName = "gemini-3.1-flash-lite",
+            apiKey = "AIzaSyAvL3Sa8PEN2N4TvN220y3QELJNXbM9W_I"
         )
     }
 }

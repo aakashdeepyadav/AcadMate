@@ -132,7 +132,7 @@ fun ExamScreen(
                     enabled = question.selectedIndex != null,
                     modifier = Modifier.weight(1f).height(56.dp)
                 ) {
-                    Text(if (canSubmit) "Finish Exam" else "Next")
+                    Text(if (canSubmit) "Submit Quiz" else "Next")
                 }
             }
         }

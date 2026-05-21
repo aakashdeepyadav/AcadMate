@@ -30,6 +30,12 @@ import coil.compose.AsyncImage
 import androidx.compose.ui.layout.ContentScale
 import com.acadmate.attendance.domain.StudentAttendanceRecord
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.RoundedCornerShape
+import com.acadmate.designsystem.components.ButtonVariant
+import java.util.Locale
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FacultyMarkAttendanceScreen(
@@ -40,7 +46,7 @@ fun FacultyMarkAttendanceScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val isBroadcasting = uiState.isSessionActive
-    var timeLeft by remember { mutableStateOf(600) } // 10 minutes
+    var timeLeft by remember { mutableIntStateOf(600) } // 10 minutes
     
     var selectedSubject by remember { mutableStateOf(if (classId == "General") "" else classId) }
     var expanded by remember { mutableStateOf(false) }
@@ -102,30 +108,57 @@ fun FacultyMarkAttendanceScreen(
                 )
                 
                 Spacer(modifier = Modifier.height(16.dp))
-                
-                Text(
-                    text = "Live Student List ($selectedSubject)",
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                    fontWeight = FontWeight.Bold
-                )
-                
-                // Live Student List
-                LazyColumn(
-                    modifier = Modifier.weight(1f),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    val presentStudents = uiState.students.filter { it.isPresent }
-                    if (presentStudents.isEmpty()) {
-                        item {
-                            Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                                Text("Waiting for students to mark attendance...", color = Color.Gray)
+
+                if (uiState.isQrMode && uiState.currentQrToken != null) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().weight(1f),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Text("Dynamic Attendance QR", fontWeight = FontWeight.Bold)
+                        Text("Changes every 10 seconds", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                        
+                        Spacer(modifier = Modifier.height(24.dp))
+                        
+                        DynamicQrCode(
+                            token = uiState.currentQrToken!!,
+                            modifier = Modifier.size(280.dp)
+                        )
+                        
+                        Spacer(modifier = Modifier.height(24.dp))
+                        
+                        Text(
+                            text = uiState.currentQrToken!!,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Black,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                } else {
+                    Text(
+                        text = "Live Student List ($selectedSubject)",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        fontWeight = FontWeight.Bold
+                    )
+                    
+                    // Live Student List
+                    LazyColumn(
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        val presentStudents = uiState.students.filter { it.isPresent }
+                        if (presentStudents.isEmpty()) {
+                            item {
+                                Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                                    Text("Waiting for students to mark attendance...", color = Color.Gray)
+                                }
                             }
                         }
-                    }
-                    items(presentStudents) { student ->
-                        LiveStudentItem(student)
+                        items(presentStudents) { student ->
+                            LiveStudentItem(student)
+                        }
                     }
                 }
             } else {
@@ -156,7 +189,7 @@ fun FacultyMarkAttendanceScreen(
                                     onValueChange = {},
                                     readOnly = true,
                                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                                    modifier = Modifier.menuAnchor().fillMaxWidth(),
+                                    modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable, true).fillMaxWidth(),
                                     shape = MaterialTheme.shapes.medium
                                 )
                                 
@@ -188,6 +221,16 @@ fun FacultyMarkAttendanceScreen(
             // Bottom Actions
             Surface(tonalElevation = 4.dp, modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp)) {
+                    if (isBroadcasting) {
+                        AcadMateButton(
+                            text = if (uiState.isQrMode) "Switch to List View" else "Display QR Code",
+                            onClick = { viewModel.toggleQrMode() },
+                            modifier = Modifier.fillMaxWidth(),
+                            variant = ButtonVariant.Secondary
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                    
                     AcadMateButton(
                         text = if (isBroadcasting) "Stop Session" else "Start Session",
                         onClick = { 
@@ -214,6 +257,43 @@ fun FacultyMarkAttendanceScreen(
 }
 
 @Composable
+fun DynamicQrCode(token: String, modifier: Modifier = Modifier) {
+    // High-fidelity stylized QR simulation
+    Box(
+        modifier = modifier
+            .background(Color.White, RoundedCornerShape(16.dp))
+            .border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(16.dp))
+            .padding(16.dp)
+    ) {
+        androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
+            val size = 15
+            val cellSize = this.size.width / size
+            val random = java.util.Random(token.hashCode().toLong())
+
+            for (x in 0 until size) {
+                for (y in 0 until size) {
+                    // Position Detection Patterns (Corners)
+                    val isCorner = (x < 3 && y < 3) || (x > size - 4 && y < 3) || (x < 3 && y > size - 4)
+                    if (isCorner) {
+                        drawRect(
+                            color = Color.Black,
+                            topLeft = androidx.compose.ui.geometry.Offset(x * cellSize, y * cellSize),
+                            size = androidx.compose.ui.geometry.Size(cellSize, cellSize)
+                        )
+                    } else if (random.nextBoolean()) {
+                        drawRect(
+                            color = Color.Black,
+                            topLeft = androidx.compose.ui.geometry.Offset(x * cellSize, y * cellSize),
+                            size = androidx.compose.ui.geometry.Size(cellSize, cellSize)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun BroadcastStatusCard(timeLeft: Int, presentCount: Int, totalCount: Int) {
     AcadMateCard(
         variant = CardVariant.Flat,
@@ -228,7 +308,7 @@ fun BroadcastStatusCard(timeLeft: Int, presentCount: Int, totalCount: Int) {
             Column {
                 Text("Time Remaining", style = MaterialTheme.typography.labelSmall)
                 Text(
-                    text = String.format("%02d:%02d", timeLeft / 60, timeLeft % 60),
+                    text = String.format(Locale.getDefault(), "%02d:%02d", timeLeft / 60, timeLeft % 60),
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Black,
                     color = MaterialTheme.colorScheme.primary
@@ -239,7 +319,7 @@ fun BroadcastStatusCard(timeLeft: Int, presentCount: Int, totalCount: Int) {
                 Text("Presence", style = MaterialTheme.typography.labelSmall)
                 Row(verticalAlignment = Alignment.Bottom) {
                     Text(
-                        text = "$presentCount",
+                        text = presentCount.toString(),
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Black,
                         color = MaterialTheme.colorScheme.primary

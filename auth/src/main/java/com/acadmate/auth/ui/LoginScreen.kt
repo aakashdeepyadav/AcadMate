@@ -37,7 +37,7 @@ import com.acadmate.designsystem.components.MeshBackground
 @Composable
 fun LoginScreen(
     onOtpSent: (String) -> Unit,
-    onLoginSuccess: (String) -> Unit,
+    onLoginSuccess: (AuthUiState) -> Unit,
     onBack: () -> Unit,
     viewModel: AuthViewModel = hiltViewModel()
 ) {
@@ -76,6 +76,9 @@ fun LoginScreen(
             is AuthUiState.Verified -> {
                 showSuccess = true
             }
+            is AuthUiState.ForcePasswordChange -> {
+                showSuccess = true
+            }
             is AuthUiState.Idle -> {
                 lastPhoneInputState = null
             }
@@ -96,7 +99,7 @@ fun LoginScreen(
 
     if (showSuccess) {
         LoginSuccessScreen {
-            onLoginSuccess((uiState as? AuthUiState.Verified)?.token ?: "")
+            onLoginSuccess(uiState)
         }
         return
     }

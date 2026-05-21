@@ -31,11 +31,18 @@ fun ManageNotificationsScreen(
     viewModel: NotificationsViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
+    val userRole by viewModel.userRole.collectAsStateWithLifecycle(initialValue = null)
+    val isFaculty = userRole == com.acadmate.core.model.UserRole.FACULTY
+
     val attendanceAlerts by viewModel.attendanceAlertsEnabled.collectAsStateWithLifecycle(initialValue = true)
     val assignmentReminders by viewModel.assignmentRemindersEnabled.collectAsStateWithLifecycle(initialValue = true)
     val examNotifications by viewModel.examNotificationsEnabled.collectAsStateWithLifecycle(initialValue = true)
     val smartInsights by viewModel.smartInsightsEnabled.collectAsStateWithLifecycle(initialValue = false)
     
+    val sessionReports by viewModel.sessionReportsEnabled.collectAsStateWithLifecycle(initialValue = true)
+    val securityAnomalies by viewModel.securityAnomaliesEnabled.collectAsStateWithLifecycle(initialValue = true)
+    val leaveRequests by viewModel.leaveRequestsEnabled.collectAsStateWithLifecycle(initialValue = true)
+
     val autoAlarms by viewModel.autoAlarmsEnabled.collectAsStateWithLifecycle(initialValue = false)
     val alarmVibration by viewModel.alarmVibrationEnabled.collectAsStateWithLifecycle(initialValue = true)
     val alarmVolume by viewModel.alarmVolume.collectAsStateWithLifecycle(initialValue = 70)
@@ -46,7 +53,12 @@ fun ManageNotificationsScreen(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
-            val uri = result.data?.getParcelableExtra<Uri>(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
+            val uri = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                result.data?.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI, Uri::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                result.data?.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
+            }
             if (uri != null) {
                 viewModel.setAlarmTone(uri.toString())
             }
@@ -93,42 +105,84 @@ fun ManageNotificationsScreen(
 
             AcadMateCard(variant = CardVariant.Flat) {
                 Column {
+                    if (!isFaculty) {
+                        NotificationToggleRow(
+                            title = "Attendance Alerts",
+                            subtitle = "Notify when attendance is marked or missed",
+                            checked = attendanceAlerts,
+                            onCheckedChange = { viewModel.setAttendanceAlertsEnabled(it) }
+                        )
+                        HorizontalDivider(
+                            modifier = Modifier.padding(vertical = 4.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.1f)
+                        )
+                    } else {
+                        NotificationToggleRow(
+                            title = "Session Reports",
+                            subtitle = "Receive daily summaries of your classes",
+                            checked = sessionReports,
+                            onCheckedChange = { viewModel.setSessionReportsEnabled(it) }
+                        )
+                        HorizontalDivider(
+                            modifier = Modifier.padding(vertical = 4.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.1f)
+                        )
+                        NotificationToggleRow(
+                            title = "Security Anomalies",
+                            subtitle = "Real-time alerts for proxy attempts",
+                            checked = securityAnomalies,
+                            onCheckedChange = { viewModel.setSecurityAnomaliesEnabled(it) }
+                        )
+                        HorizontalDivider(
+                            modifier = Modifier.padding(vertical = 4.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.1f)
+                        )
+                    }
+
                     NotificationToggleRow(
-                        title = "Attendance Alerts",
-                        subtitle = "Notify when attendance is marked or missed",
-                        checked = attendanceAlerts,
-                        onCheckedChange = { viewModel.setAttendanceAlertsEnabled(it) }
-                    )
-                    HorizontalDivider(
-                        modifier = Modifier.padding(vertical = 4.dp),
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.1f)
-                    )
-                    NotificationToggleRow(
-                        title = "Assignment Deadlines",
-                        subtitle = "Reminders for upcoming submissions",
+                        title = if (isFaculty) "Assignment Submissions" else "Assignment Deadlines",
+                        subtitle = if (isFaculty) "Notify when students submit work" else "Reminders for upcoming submissions",
                         checked = assignmentReminders,
                         onCheckedChange = { viewModel.setAssignmentRemindersEnabled(it) }
                     )
+                    
                     HorizontalDivider(
                         modifier = Modifier.padding(vertical = 4.dp),
                         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.1f)
                     )
+                    
+                    if (isFaculty) {
+                        NotificationToggleRow(
+                            title = "Leave Requests",
+                            subtitle = "Notify when students apply for leave",
+                            checked = leaveRequests,
+                            onCheckedChange = { viewModel.setLeaveRequestsEnabled(it) }
+                        )
+                        HorizontalDivider(
+                            modifier = Modifier.padding(vertical = 4.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.1f)
+                        )
+                    }
+
                     NotificationToggleRow(
-                        title = "Exams & Results",
-                        subtitle = "Updates on schedules and marks",
+                        title = "Exams & Scheduling",
+                        subtitle = "Updates on dates and schedules",
                         checked = examNotifications,
                         onCheckedChange = { viewModel.setExamNotificationsEnabled(it) }
                     )
-                    HorizontalDivider(
-                        modifier = Modifier.padding(vertical = 4.dp),
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.1f)
-                    )
-                    NotificationToggleRow(
-                        title = "AI Smart Insights",
-                        subtitle = "Personalized study tips and gap analysis",
-                        checked = smartInsights,
-                        onCheckedChange = { viewModel.setSmartInsightsEnabled(it) }
-                    )
+                    
+                    if (!isFaculty) {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(vertical = 4.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.1f)
+                        )
+                        NotificationToggleRow(
+                            title = "AI Smart Insights",
+                            subtitle = "Personalized study tips and gap analysis",
+                            checked = smartInsights,
+                            onCheckedChange = { viewModel.setSmartInsightsEnabled(it) }
+                        )
+                    }
                 }
             }
 
@@ -143,7 +197,7 @@ fun ManageNotificationsScreen(
                 Column(modifier = Modifier.padding(vertical = 8.dp)) {
                     NotificationToggleRow(
                         title = "Smart Auto-Alarm",
-                        subtitle = "Ring 1 hour before your FIRST class",
+                        subtitle = if (isFaculty) "Ring before your FIRST session" else "Ring 1 hour before your FIRST class",
                         checked = autoAlarms,
                         onCheckedChange = { viewModel.setAutoAlarmsEnabled(it) }
                     )
@@ -154,7 +208,7 @@ fun ManageNotificationsScreen(
                             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.1f)
                         )
                         
-                        Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                        Column(modifier = Modifier.padding(vertical = 8.dp, horizontal = 16.dp)) {
                             Text("Time Before Class", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text("${alarmMinutesBefore}m", style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(32.dp))
@@ -168,7 +222,7 @@ fun ManageNotificationsScreen(
                             }
                         }
 
-                        Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                        Column(modifier = Modifier.padding(vertical = 8.dp, horizontal = 16.dp)) {
                             Text("Alarm Volume", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text("${alarmVolume}%", style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(32.dp))
@@ -191,7 +245,7 @@ fun ManageNotificationsScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 8.dp),
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
@@ -216,7 +270,7 @@ fun ManageNotificationsScreen(
                 }
             }
             
-            Spacer(modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.height(32.dp))
             
             Text(
                 text = "Note: System critical alerts cannot be disabled.",

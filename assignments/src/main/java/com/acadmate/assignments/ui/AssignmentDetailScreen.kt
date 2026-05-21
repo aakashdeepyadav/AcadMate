@@ -37,14 +37,20 @@ fun AssignmentDetailScreen(
     val assignment = assignments.find { it.id == assignmentId }
     val isUploading by viewModel.isUploading.collectAsState()
     val uploadSuccess by viewModel.uploadSuccess.collectAsState()
+    val submissionStatus by viewModel.submissionStatus.collectAsState()
     val userId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
 
     var selectedUri by remember { mutableStateOf<Uri?>(null) }
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { selectedUri = it }
 
+    LaunchedEffect(assignmentId) {
+        viewModel.checkSubmissionStatus(assignmentId)
+    }
+
     LaunchedEffect(uploadSuccess) {
         if (uploadSuccess) {
             viewModel.resetUploadState()
+            viewModel.checkSubmissionStatus(assignmentId)
             selectedUri = null
         }
     }
@@ -103,14 +109,54 @@ fun AssignmentDetailScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
+                if (assignment.guidelineUrls.isNotEmpty()) {
+                    Text(
+                        text = "Guideline Materials",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    
+                    assignment.guidelineUrls.forEachIndexed { index, _ ->
+                        AcadMateCard(
+                            variant = CardVariant.Flat,
+                            onClick = { /* In a real app, open the URL in a browser or PDF viewer */ }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.PictureAsPdf, null, tint = MaterialTheme.colorScheme.primary)
+                                Spacer(Modifier.width(12.dp))
+                                Text("Attachment ${index + 1}", style = MaterialTheme.typography.bodyMedium)
+                                Spacer(Modifier.weight(1f))
+                                Icon(Icons.Default.OpenInNew, null, modifier = Modifier.size(16.dp), tint = Color.Gray)
+                            }
+                        }
+                    }
+                }
+
                 Spacer(Modifier.weight(1f))
 
                 AcadMateCard(variant = CardVariant.Flat) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text("Your Submission", fontWeight = FontWeight.Bold)
-                        Spacer(Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
                         
-                        if (selectedUri != null) {
+                        if (submissionStatus != null) {
+                            Surface(
+                                color = Color(0xFF10B981).copy(alpha = 0.1f),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(16.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(Icons.Default.CheckCircle, null, tint = Color(0xFF10B981))
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Text("Assignment $submissionStatus", color = Color(0xFF10B981), fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        } else if (selectedUri != null) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Default.Description, null, tint = MaterialTheme.colorScheme.primary)
                                 Spacer(Modifier.width(12.dp))
@@ -133,15 +179,17 @@ fun AssignmentDetailScreen(
                     }
                 }
 
-                AcadMateButton(
-                    text = "Submit Assignment",
-                    onClick = { 
-                        selectedUri?.let { viewModel.submitAssignment(assignment.id, it, userId) }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = selectedUri != null && !isUploading,
-                    loading = isUploading
-                )
+                if (submissionStatus == null) {
+                    AcadMateButton(
+                        text = "Submit Assignment",
+                        onClick = { 
+                            selectedUri?.let { viewModel.submitAssignment(assignment.id, it, userId) }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = selectedUri != null && !isUploading,
+                        loading = isUploading
+                    )
+                }
                 
                 if (uploadSuccess) {
                     Text(

@@ -118,6 +118,18 @@ class AdminTimetableViewModel : ViewModel() {
         }
     }
 
+    private suspend fun logAdminAction(title: String, type: com.acadmate.core.model.ActionType, description: String) {
+        try {
+            val actionData = hashMapOf(
+                "title" to title,
+                "timestamp" to System.currentTimeMillis(),
+                "type" to type.name,
+                "description" to description
+            )
+            firestore.collection("admin_logs").add(actionData).await()
+        } catch (e: Exception) {}
+    }
+
     fun addTimetableItem(subject: String, faculty: String, start: String, end: String, room: String) {
         viewModelScope.launch {
             try {
@@ -147,6 +159,7 @@ class AdminTimetableViewModel : ViewModel() {
                 firestore.collection("global_timetable").document(id).set(map).await()
                 _timetable.add(entity)
                 _timetable.sortBy { it.startTime }
+                logAdminAction("Schedule Slot Added", com.acadmate.core.model.ActionType.INSTITUTION_UPDATED, "$subject at $start in $room.")
             } catch (e: Exception) {}
         }
     }
@@ -177,6 +190,7 @@ class AdminTimetableViewModel : ViewModel() {
                     _timetable[index] = updated
                     _timetable.sortBy { it.startTime }
                 }
+                logAdminAction("Schedule Modified", com.acadmate.core.model.ActionType.INSTITUTION_UPDATED, "Slot for $subject updated.")
             } catch (e: Exception) {}
         }
     }
@@ -186,6 +200,7 @@ class AdminTimetableViewModel : ViewModel() {
             try {
                 firestore.collection("global_timetable").document(id).delete().await()
                 _timetable.removeAll { it.id == id }
+                logAdminAction("Schedule Slot Removed", com.acadmate.core.model.ActionType.SYSTEM_ALERT, "A timetable entry was deleted.")
             } catch (e: Exception) {}
         }
     }

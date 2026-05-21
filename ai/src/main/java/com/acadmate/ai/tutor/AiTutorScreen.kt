@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -22,6 +23,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -42,11 +44,22 @@ fun AiTutorScreen(
     val suggestions by viewModel.suggestions.collectAsState()
     val isTyping by viewModel.isTyping.collectAsState()
     val realSyllabus by viewModel.realSyllabus.collectAsState()
+    val sessions by viewModel.sessions.collectAsState()
+    val currentSession by viewModel.currentSession.collectAsState()
     
     val listState = rememberLazyListState()
     var inputText by remember { mutableStateOf("") }
-    var selectedSubject by remember { mutableStateOf<String?>(initialSubject) }
-    var selectedUnit by remember { mutableStateOf<String?>(null) }
+    var selectedSubject by remember { mutableStateOf<String?>(initialSubject ?: currentSession?.subject) }
+    var selectedUnit by remember { mutableStateOf<String?>(currentSession?.unit) }
+    var showHistory by remember { mutableStateOf(false) }
+
+    val sheetState = rememberModalBottomSheetState()
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(currentSession) {
+        selectedSubject = currentSession?.subject ?: selectedSubject
+        selectedUnit = currentSession?.unit ?: selectedUnit
+    }
 
     LaunchedEffect(mode) {
         viewModel.setMode(mode)
@@ -70,13 +83,22 @@ fun AiTutorScreen(
         topBar = {
             TopAppBar(
                 title = { 
-                    Text(
-                        when(mode) {
-                            "INTERVIEW" -> "Interview Prep"
-                            "PLANNER" -> "Study Planner"
-                            else -> "AI Tutor"
+                    Column {
+                        Text(
+                            when(mode) {
+                                "INTERVIEW" -> "Interview Prep"
+                                "PLANNER" -> "Study Planner"
+                                else -> "AI Tutor"
+                            }
+                        )
+                        if (currentSession?.subject != null) {
+                            Text(
+                                text = "${currentSession?.subject}${if (currentSession?.unit != null) " • ${currentSession?.unit}" else ""}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
                         }
-                    ) 
+                    }
                 },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
@@ -84,6 +106,9 @@ fun AiTutorScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { showHistory = true }) {
+                        Icon(Icons.Default.History, contentDescription = "History")
+                    }
                     IconButton(onClick = { viewModel.clearChat() }) {
                         Icon(Icons.Default.Delete, contentDescription = "Clear Chat")
                     }
@@ -91,48 +116,177 @@ fun AiTutorScreen(
             )
         }
     ) { padding ->
+        if (showHistory) {
+            ModalBottomSheet(
+                onDismissRequest = { showHistory = false },
+                sheetState = sheetState
+            ) {
+                var isCreatingNew by remember { mutableStateOf(false) }
+
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    item {
+                        Text(
+                            if (isCreatingNew) "New AI Session" else "Chat History",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(bottom = 16.dp)
+                        )
+                    }
+                    
+                    if (isCreatingNew) {
+                        item {
+                            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                                Text("Select Subject (Optional)", style = MaterialTheme.typography.labelMedium)
+                                ScrollableTabRow(
+                                    selectedTabIndex = subjects.indexOf(selectedSubject).coerceAtLeast(0),
+                                    edgePadding = 0.dp,
+                                    containerColor = Color.Transparent,
+                                    divider = {}
+                                ) {
+                                    subjects.forEach { subject ->
+                                        FilterChip(
+                                            selected = selectedSubject == subject,
+                                            onClick = { 
+                                                selectedSubject = if (selectedSubject == subject) null else subject 
+                                                selectedUnit = null
+                                            },
+                                            label = { Text(subject) }
+                                        )
+                                    }
+                                }
+
+                                if (units.isNotEmpty()) {
+                                    Text("Select Unit (Optional)", style = MaterialTheme.typography.labelMedium)
+                                    ScrollableTabRow(
+                                        selectedTabIndex = units.indexOf(selectedUnit).coerceAtLeast(0),
+                                        edgePadding = 0.dp,
+                                        containerColor = Color.Transparent,
+                                        divider = {}
+                                    ) {
+                                        units.forEach { unit ->
+                                            FilterChip(
+                                                selected = selectedUnit == unit,
+                                                onClick = { selectedUnit = if (selectedUnit == unit) null else unit },
+                                                label = { Text(unit) }
+                                            )
+                                        }
+                                    }
+                                }
+
+                                Button(
+                                    onClick = {
+                                        viewModel.createNewSession(mode, selectedSubject, selectedUnit)
+                                        showHistory = false
+                                    },
+                                    modifier = Modifier.fillMaxWidth().padding(top = 16.dp)
+                                ) {
+                                    Text("Start Chat")
+                                }
+                                
+                                TextButton(
+                                    onClick = { isCreatingNew = false },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text("Back to History")
+                                }
+                            }
+                        }
+                    } else {
+                        val filteredSessions = sessions.filter { it.mode == mode }
+                        if (filteredSessions.isEmpty()) {
+                            item { Text("No previous sessions found", color = Color.Gray) }
+                        }
+
+                        items(filteredSessions) { session ->
+                            Card(
+                                onClick = {
+                                    viewModel.loadConversationHistory(session.id)
+                                    showHistory = false
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (currentSession?.id == session.id) 
+                                        MaterialTheme.colorScheme.primaryContainer 
+                                        else MaterialTheme.colorScheme.surfaceVariant
+                                )
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Text(session.title, fontWeight = FontWeight.Bold)
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            session.subject ?: "General",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                        if (session.unit != null) {
+                                            Text(" • ", style = MaterialTheme.typography.bodySmall)
+                                            Text(
+                                                session.unit,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.secondary
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        
+                        item {
+                            Button(
+                                onClick = { isCreatingNew = true },
+                                modifier = Modifier.fillMaxWidth().padding(top = 16.dp)
+                            ) {
+                                Icon(Icons.Default.Add, null)
+                                Spacer(Modifier.width(8.dp))
+                                Text("New Chat")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // Subject Selector
-            ScrollableTabRow(
-                selectedTabIndex = subjects.indexOf(selectedSubject).coerceAtLeast(0),
-                edgePadding = 16.dp,
-                containerColor = Color.Transparent,
-                divider = {}
-            ) {
-                subjects.forEach { subject ->
-                    FilterChip(
-                        selected = selectedSubject == subject,
-                        onClick = { 
-                            selectedSubject = if (selectedSubject == subject) null else subject 
-                            selectedUnit = null
-                        },
-                        label = { Text(subject) },
-                        modifier = Modifier.padding(horizontal = 4.dp)
-                    )
-                }
-            }
-
-            // Unit Selector (Visible only if subject is selected)
-            AnimatedVisibility(visible = units.isNotEmpty()) {
-                ScrollableTabRow(
-                    selectedTabIndex = units.indexOf(selectedUnit).coerceAtLeast(0),
-                    edgePadding = 16.dp,
-                    containerColor = Color.Transparent,
-                    divider = {}
+            // Context Selectors removed from here to reduce noise as requested
+            
+            if (mode == "INTERVIEW") {
+                // Modern Skill Chips for Interview Prep
+                val skills = listOf("DSA", "System Design", "OS/DBMS", "Android", "Backend", "Behavioral")
+                LazyRow(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    units.forEach { unit ->
-                        FilterChip(
-                            selected = selectedUnit == unit,
-                            onClick = { selectedUnit = if (selectedUnit == unit) null else unit },
-                            label = { Text(unit) },
-                            modifier = Modifier.padding(horizontal = 4.dp),
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer
-                            )
+                    items(skills) { skill ->
+                        AssistChip(
+                            onClick = { 
+                                inputText = "I want to practice $skill interview questions"
+                                viewModel.sendMessage(inputText, null, null)
+                                inputText = ""
+                            },
+                            label = { Text(skill) },
+                            leadingIcon = {
+                                Icon(
+                                    when(skill) {
+                                        "DSA" -> Icons.Default.Code
+                                        "System Design" -> Icons.Default.Schema
+                                        "Android" -> Icons.Default.Android
+                                        "Behavioral" -> Icons.Default.Person
+                                        else -> Icons.Default.Build
+                                    },
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
                         )
                     }
                 }

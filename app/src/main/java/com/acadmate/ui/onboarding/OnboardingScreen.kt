@@ -67,8 +67,8 @@ fun OnboardingScreen(
             accentColor = Color(0xFF8B5CF6)
         ),
         OnboardingPage(
-            title = "Elite Command Center",
-            subtitle = "A unified operating system for students, faculty, and administrators to eliminate institutional drag.",
+            title = "Elite Operating System",
+            subtitle = "A unified, high-performance command center for students, faculty, and administrators.",
             lottieRes = R.raw.everything_one_place,
             accentColor = Color(0xFFEC4899)
         )

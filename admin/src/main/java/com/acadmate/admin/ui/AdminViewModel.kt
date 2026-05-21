@@ -57,11 +57,59 @@ class AdminViewModel @Inject constructor(
         }
     }
 
+    fun bulkCreateUsers(users: List<Map<String, String>>) {
+        viewModelScope.launch {
+            _uiState.value = AdminUiState.Loading
+            try {
+                val batch = firestore.batch()
+                var count = 0
+                
+                users.forEach { data ->
+                    val regNo = data["regNo"] ?: return@forEach
+                    val name = data["name"] ?: ""
+                    val email = data["email"] ?: ""
+                    val roleStr = data["role"] ?: "STUDENT"
+                    val role = UserRole.fromString(roleStr)
+                    val phone = data["phoneNumber"] ?: ""
+                    
+                    val formattedPhone = if (phone.startsWith("+")) phone else "+91$phone"
+                    
+                    val userData = hashMapOf(
+                        "regNo" to regNo,
+                        "name" to name,
+                        "email" to email,
+                        "role" to role.name,
+                        "phoneNumber" to formattedPhone,
+                        "password" to "Password@123",
+                        "isFirstLogin" to true,
+                        "createdAt" to System.currentTimeMillis(),
+                        "updatedAt" to System.currentTimeMillis()
+                    )
+                    
+                    val docRef = firestore.collection("users").document(regNo)
+                    batch.set(docRef, userData)
+                    count++
+                }
+                
+                if (count > 0) {
+                    batch.commit().await()
+                    logAdminAction("Bulk Import Completed", ActionType.USER_CREATED, "Imported $count users via CSV.")
+                }
+                
+                loadUsers()
+                loadAdminDashboard()
+            } catch (e: Exception) {
+                _uiState.value = AdminUiState.Error("Bulk import failed: ${e.message}")
+            }
+        }
+    }
+
     fun deleteUser(userId: String) {
         viewModelScope.launch {
             try {
                 firestore.collection("users").document(userId).delete().await()
                 _usersList.value = _usersList.value.filter { it.id != userId }
+                logAdminAction("User Removed", ActionType.SYSTEM_ALERT, "Account ID $userId was deleted from the system.")
                 loadAdminDashboard() // Refresh stats
             } catch (e: Exception) {
                 _uiState.value = AdminUiState.Error("Failed to delete user: ${e.message}")
@@ -163,6 +211,20 @@ class AdminViewModel @Inject constructor(
         }
     }
 
+    private suspend fun logAdminAction(title: String, type: ActionType, description: String) {
+        try {
+            val actionData = hashMapOf(
+                "title" to title,
+                "timestamp" to System.currentTimeMillis(),
+                "type" to type.name,
+                "description" to description
+            )
+            firestore.collection("admin_logs").add(actionData).await()
+        } catch (e: Exception) {
+            // Silently fail logging
+        }
+    }
+
     fun createInstitutionalUser(
         regNo: String,
         name: String,
@@ -206,14 +268,7 @@ class AdminViewModel @Inject constructor(
                 // Add to Firestore. In a production app, you would also create a Firebase Auth entry.
                 firestore.collection("users").document(regNo).set(userData).await()
                 
-                // Log the action
-                val actionData = hashMapOf(
-                    "title" to "New User Created",
-                    "timestamp" to System.currentTimeMillis(),
-                    "type" to ActionType.USER_CREATED.name,
-                    "description" to "$name ($role) added to the system."
-                )
-                firestore.collection("admin_logs").add(actionData).await()
+                logAdminAction("New User Created", ActionType.USER_CREATED, "$name ($role) added to the system.")
                 
                 loadUsers() // Refresh list
                 loadAdminDashboard() // Refresh stats
@@ -242,6 +297,8 @@ class AdminViewModel @Inject constructor(
                 
                 firestore.collection("users").document(userId).update(userData).await()
                 
+                logAdminAction("User Updated", ActionType.USER_CREATED, "Profile for $name was updated.")
+                
                 loadUsers() // Refresh list
                 loadAdminDashboard() // Refresh stats
             } catch (e: Exception) {
@@ -261,21 +318,9 @@ class AdminViewModel @Inject constructor(
                 )
                 firestore.collection("announcements").add(announcementData).await()
                 
-                // Add to recent actions
-                val newAction = com.acadmate.core.model.AdminAction(
-                    id = System.currentTimeMillis().toString(),
-                    title = "Announcement Posted",
-                    timestamp = System.currentTimeMillis(),
-                    type = ActionType.ANNOUNCEMENT_POSTED,
-                    description = title
-                )
+                logAdminAction("Announcement Posted", ActionType.ANNOUNCEMENT_POSTED, title)
                 
-                val currentState = _uiState.value
-                if (currentState is AdminUiState.Success) {
-                    _uiState.value = currentState.copy(
-                        recentActions = listOf(newAction) + currentState.recentActions.take(9)
-                    )
-                }
+                loadAdminDashboard() // Refresh dashboard to see new log
             } catch (e: Exception) {
                 _uiState.value = AdminUiState.Error("Failed to post announcement: ${e.message}")
             }

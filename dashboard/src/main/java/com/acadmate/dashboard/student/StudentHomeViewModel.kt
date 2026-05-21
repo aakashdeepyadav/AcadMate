@@ -122,17 +122,19 @@ class StudentHomeViewModel @Inject constructor(
             userRepository.syncUserData(userId)
             
             userRepository.getCurrentUser().collectLatest { user ->
-                user?.let {
+                if (user != null) {
                     _uiState.value = _uiState.value.copy(
-                        studentName = it.name,
-                        studentEmail = it.email,
-                        studentPhone = it.phoneNumber,
-                        studentEnrollment = it.regNo ?: "N/A",
-                        studentDepartment = it.department ?: "General",
-                        studentRole = it.role.name,
-                        studentAddress = it.address ?: "N/A",
-                        profilePictureUrl = it.profilePictureUrl
+                        studentName = user.name,
+                        studentEmail = user.email,
+                        studentPhone = user.phoneNumber,
+                        studentEnrollment = user.regNo ?: "N/A",
+                        studentDepartment = user.department ?: "General",
+                        studentRole = user.role.name,
+                        studentAddress = user.address ?: "N/A",
+                        profilePictureUrl = user.profilePictureUrl
                     )
+                } else {
+                    _uiState.value = HomeUiState()
                 }
             }
         }
@@ -200,12 +202,19 @@ class StudentHomeViewModel @Inject constructor(
                 
                 val todayScheduleRaw = timetableRepository.getTimetableForDaySync(dayOfWeek)
                 
-                // Find currently running class from timetable or active sessions
+                // Find currently running class from timetable
                 val timetableCurrent = todayScheduleRaw.find { 
                     nowTime >= it.startTime && nowTime <= it.endTime 
                 }
                 
-                val currentClassDisplay = liveClassId ?: timetableCurrent?.subject
+                // Logic: Student can only mark attendance if:
+                // 1. Teacher has started an active session
+                // 2. The session corresponds to a class currently running in the timetable
+                val isWithinPeriod = liveClassId != null && todayScheduleRaw.any { 
+                    it.subject == liveClassId && nowTime >= it.startTime && nowTime <= it.endTime 
+                }
+
+                val currentClassDisplay = if (isWithinPeriod) liveClassId else null
 
                 // Find next upcoming class
                 val nextUpcoming = todayScheduleRaw.filter { it.startTime > nowTime }

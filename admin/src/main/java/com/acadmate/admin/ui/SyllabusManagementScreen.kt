@@ -70,7 +70,7 @@ fun SyllabusManagementScreen(
                         val finalUnits = units.map { mu ->
                             SyllabusUnit(
                                 title = mu.title,
-                                topics = mu.topicsRaw.split("\n").map { it.trim() }.filter { it.isNotEmpty() }
+                                topics = mu.topicsRaw.split(",").map { it.trim() }.filter { it.isNotEmpty() }
                             )
                         }
                         viewModel.publishSyllabus(
@@ -133,7 +133,7 @@ fun SyllabusManagementScreen(
                                             credits = existing.credits.toString()
                                             ltp = existing.ltp
                                             units = existing.units.map { 
-                                                MutableUnit(it.title, it.topics.joinToString("\n")) 
+                                                MutableUnit(it.title, it.topics.joinToString(", ")) 
                                             }
                                         } else {
                                             subjectName = sub.name
@@ -223,8 +223,8 @@ fun SyllabusManagementScreen(
                                 onValueChange = { newTopics ->
                                     units = units.toMutableList().apply { this[index] = unit.copy(topicsRaw = newTopics) }
                                 },
-                                label = "Topics (One per line)",
-                                placeholder = "Topic 1\nTopic 2\nTopic 3",
+                                label = "Topics (Separated by comma)",
+                                placeholder = "Topic 1, Topic 2, Topic 3",
                                 singleLine = false,
                                 modifier = Modifier.height(120.dp)
                             )

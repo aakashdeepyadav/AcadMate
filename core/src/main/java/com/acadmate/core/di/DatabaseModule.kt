@@ -46,6 +46,36 @@ object DatabaseModule {
 
     @Provides
     @Singleton
+    fun provideAssignmentDao(database: AppDatabase): com.acadmate.core.db.AssignmentDao {
+        return database.assignmentDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideNoticeDao(database: AppDatabase): com.acadmate.core.db.NoticeDao {
+        return database.noticeDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideSyllabusDao(database: AppDatabase): com.acadmate.core.db.SyllabusDao {
+        return database.syllabusDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideAttendanceDao(database: AppDatabase): com.acadmate.core.db.AttendanceDao {
+        return database.attendanceDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideResultDao(database: AppDatabase): com.acadmate.core.db.ResultDao {
+        return database.resultDao()
+    }
+
+    @Provides
+    @Singleton
     fun provideUserRepository(
         userDao: UserDao,
         timetableDao: com.acadmate.core.db.TimetableDao,
@@ -65,8 +95,41 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun provideSyllabusRepository(
-        syllabusGapDao: com.acadmate.core.db.SyllabusGapDao
+        syllabusGapDao: com.acadmate.core.db.SyllabusGapDao,
+        syllabusDao: com.acadmate.core.db.SyllabusDao
     ): com.acadmate.core.db.SyllabusRepository {
-        return com.acadmate.core.db.SyllabusRepository(syllabusGapDao)
+        return com.acadmate.core.db.SyllabusRepository(syllabusGapDao, syllabusDao)
+    }
+
+    @Provides
+    @Singleton
+    fun provideAssignmentRepository(
+        assignmentDao: com.acadmate.core.db.AssignmentDao
+    ): com.acadmate.core.db.AssignmentRepository {
+        return com.acadmate.core.db.AssignmentRepository(assignmentDao)
+    }
+
+    @Provides
+    @Singleton
+    fun provideNoticeRepository(
+        noticeDao: com.acadmate.core.db.NoticeDao
+    ): com.acadmate.core.db.NoticeRepository {
+        return com.acadmate.core.db.NoticeRepository(noticeDao)
+    }
+
+    @Provides
+    @Singleton
+    fun provideAttendanceRepository(
+        attendanceDao: com.acadmate.core.db.AttendanceDao
+    ): com.acadmate.core.db.AttendanceRepository {
+        return com.acadmate.core.db.AttendanceRepository(attendanceDao)
+    }
+
+    @Provides
+    @Singleton
+    fun provideResultsRepository(
+        resultDao: com.acadmate.core.db.ResultDao
+    ): com.acadmate.core.db.ResultsRepository {
+        return com.acadmate.core.db.ResultsRepository(resultDao)
     }
 }

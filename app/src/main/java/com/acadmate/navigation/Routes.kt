@@ -148,6 +148,9 @@ sealed class Routes {
     data class RegisterProfile(val phoneNumber: String, val verificationToken: String)
 
     @Serializable
+    data class ResetPassword(val userId: String)
+
+    @Serializable
     object Results
 
     @Serializable

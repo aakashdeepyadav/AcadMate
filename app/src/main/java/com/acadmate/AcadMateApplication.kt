@@ -52,6 +52,8 @@ class AcadMateApplication : Application(), Configuration.Provider {
             }
 
             Firebase.appCheck.installAppCheckProviderFactory(factory)
+            Firebase.appCheck.setTokenAutoRefreshEnabled(true)
+            Log.d("AppCheckSetup", "App Check Provider installed and auto-refresh enabled.")
             
             if (isDebug) {
                 Log.d("AppCheckDebugToken", "************************************************************")

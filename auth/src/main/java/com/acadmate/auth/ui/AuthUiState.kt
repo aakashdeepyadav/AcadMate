@@ -11,4 +11,5 @@ sealed class AuthUiState {
     data class RequirePhoneVerification(val userId: String, val phoneNumber: String) : AuthUiState()
     data class RequirePhoneInput(val userId: String, val maskedPhone: String) : AuthUiState()
     data class PasswordResetSent(val message: String) : AuthUiState()
+    data class ForcePasswordChange(val userId: String) : AuthUiState()
 }

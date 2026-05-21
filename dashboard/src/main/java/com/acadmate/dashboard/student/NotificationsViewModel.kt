@@ -12,6 +12,8 @@ class NotificationsViewModel @Inject constructor(
     private val onboardingDataStore: OnboardingDataStore
 ) : ViewModel() {
 
+    val userRole = onboardingDataStore.selectedRole
+
     val attendanceAlertsEnabled = onboardingDataStore.attendanceAlertsEnabled
     val assignmentRemindersEnabled = onboardingDataStore.assignmentRemindersEnabled
     val examNotificationsEnabled = onboardingDataStore.examNotificationsEnabled
@@ -22,6 +24,28 @@ class NotificationsViewModel @Inject constructor(
     val alarmVibrationEnabled = onboardingDataStore.alarmVibrationEnabled
     val alarmVolume = onboardingDataStore.alarmVolume
     val alarmMinutesBefore = onboardingDataStore.alarmMinutesBefore
+
+    val sessionReportsEnabled = onboardingDataStore.sessionReportsEnabled
+    val securityAnomaliesEnabled = onboardingDataStore.securityAnomaliesEnabled
+    val leaveRequestsEnabled = onboardingDataStore.leaveRequestsEnabled
+
+    fun setSessionReportsEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            onboardingDataStore.setSessionReportsEnabled(enabled)
+        }
+    }
+
+    fun setSecurityAnomaliesEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            onboardingDataStore.setSecurityAnomaliesEnabled(enabled)
+        }
+    }
+
+    fun setLeaveRequestsEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            onboardingDataStore.setLeaveRequestsEnabled(enabled)
+        }
+    }
 
     fun setAttendanceAlertsEnabled(enabled: Boolean) {
         viewModelScope.launch {

@@ -257,7 +257,7 @@ fun ProfileSetupScreen(
                     AcadMateTextField(
                         value = email,
                         onValueChange = { email = it },
-                        label = "Institutional Email",
+                        label = "Email",
                         placeholder = "john.doe@university.edu",
                         leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(18.dp)) }
                     )

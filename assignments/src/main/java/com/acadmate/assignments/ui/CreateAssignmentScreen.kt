@@ -1,5 +1,7 @@
 package com.acadmate.assignments.ui
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -12,7 +14,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.acadmate.core.model.Assignment
@@ -35,15 +39,24 @@ fun CreateAssignmentScreen(
     var description by remember { mutableStateOf("") }
     var selectedSubject by remember { mutableStateOf("") }
     val facultyCourses by viewModel.facultyCourses.collectAsState()
+    val selectedFiles by viewModel.selectedFiles.collectAsState()
     
     val facultyId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
     val isUploading by viewModel.isUploading.collectAsState()
     val uploadSuccess by viewModel.uploadSuccess.collectAsState()
     
+    val context = LocalContext.current
     var expanded by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
     val datePickerState = rememberDatePickerState(
         initialSelectedDateMillis = System.currentTimeMillis() + 604800000 // 1 week from now
+    )
+
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+        onResult = { uri ->
+            uri?.let { viewModel.onFileSelected(it) }
+        }
     )
 
     LaunchedEffect(uploadSuccess) {
@@ -106,6 +119,46 @@ fun CreateAssignmentScreen(
                         singleLine = false,
                         modifier = Modifier.height(120.dp)
                     )
+                }
+            }
+
+            AcadMateCard(variant = CardVariant.Flat) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Text("Attachments (Guidelines/Samples)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    
+                    selectedFiles.forEach { uri ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(Icons.Default.Description, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            Text(
+                                text = uri.toString().substringAfterLast("/"),
+                                modifier = Modifier.weight(1f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            IconButton(onClick = { viewModel.removeFile(uri) }) {
+                                Icon(Icons.Default.Close, contentDescription = "Remove", tint = MaterialTheme.colorScheme.error)
+                            }
+                        }
+                    }
+
+                    OutlinedButton(
+                        onClick = { 
+                            filePickerLauncher.launch(arrayOf("application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.AttachFile, null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Attach PDF or DOC")
+                    }
                 }
             }
 
