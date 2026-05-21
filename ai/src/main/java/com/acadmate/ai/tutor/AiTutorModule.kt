@@ -35,7 +35,7 @@ object AiTutorModule {
     fun provideGenerativeModel(): GenerativeModel {
         return GenerativeModel(
             modelName = "gemini-3.1-flash-lite",
-            apiKey = "AIzaSyAvL3Sa8PEN2N4TvN220y3QELJNXbM9W_I"
+            apiKey = BuildConfig.GEMINI_API_KEY
         )
     }
 }
