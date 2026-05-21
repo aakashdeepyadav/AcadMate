@@ -18,20 +18,20 @@
 
 ## Slide 3: The Solution: AcadMate
 *   **Unified Ecosystem:** A single application for Administrators, Faculty, and Students.
-*   **Proprietary 6-Layer Security:** Making attendance proxies statistically impossible.
+*   **Proprietary 5-Layer Security:** Making attendance proxies statistically impossible.
 *   **Context-Aware AI:** Integrating Gemini 3 Flash to provide tutoring based on *real* classroom data.
 *   **Modern UX:** 100% Jetpack Compose for a fluid, enterprise-grade experience.
 
 ---
 
-## Slide 4: 6-Layer Anti-Proxy Protocol (Part 1)
+## Slide 4: 5-Layer Anti-Proxy Protocol (Part 1)
 *   **Layer 1: Hardware Binding:** Account locked to a single `ANDROID_ID`. No "phone passing."
 *   **Layer 2: Acoustic Proximity:** 18.5kHz near-ultrasonic handshakes prove the student is *inside* the four walls.
 *   **Layer 3: ML Face Liveness:** Google ML Kit detects blinks and micro-movements to block photo/video spoofing.
 
 ---
 
-## Slide 5: 6-Layer Anti-Proxy Protocol (Part 2)
+## Slide 5: 5-Layer Anti-Proxy Protocol (Part 2)
 *   **Layer 4: Campus Geofencing:** Precision GPS validation using Ray-casting algorithms.
 *   **Layer 5: Continuous Presence:** Foreground services maintain location heartbeats throughout the lecture.
 *   **Layer 6: Biometric Re-auth:** Randomized fingerprint checks ensure the device isn't left behind by an absent student.
@@ -97,7 +97,7 @@
 ---
 
 ## Slide 14: Roadmap & Impact
-*   **Phase 1 (Done):** 6-Layer Security & Core AI Tutor.
+*   **Phase 1 (Done):** 5-Layer Security & Core AI Tutor.
 *   **Phase 2 (Upcoming):** Multi-Institution Support & Blockchain-backed transcripts.
 *   **Phase 3:** AR-based classroom navigation and indoor positioning.
 *   **Impact:** Zero-proxy campus, 40% reduction in admin load, and 25% improvement in student engagement.

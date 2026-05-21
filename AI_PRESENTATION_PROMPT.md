@@ -27,13 +27,13 @@ Create a 15-slide professional, high-tech business presentation based on the fol
 *   **Heading:** AcadMate: A Unified Ecosystem
 *   **Points:**
     *   **One Platform:** Seamless integration for Admins, Faculty, and Students.
-    *   **6-Layer Security:** Technical impossibility of proxy attendance.
+    *   **5-Layer Security:** Technical impossibility of proxy attendance.
     *   **Contextual AI:** Gemini 3 Flash tutor integrated with real classroom data.
 *   **[Visual Idea]:** A central hub diagram showing the 3 roles (Admin, Faculty, Student) connected to a core database.
 
 ---
 
-### Slide 4: 6-Layer Anti-Proxy Protocol (Part 1)
+### Slide 4: 5-Layer Anti-Proxy Protocol (Part 1)
 *   **Heading:** Layer 1-3: Hardware & Proximity
 *   **Layers:**
     1.  **Hardware Binding:** Account locked to `ANDROID_ID`. No device sharing.
@@ -43,7 +43,7 @@ Create a 15-slide professional, high-tech business presentation based on the fol
 
 ---
 
-### Slide 5: 6-Layer Anti-Proxy Protocol (Part 2)
+### Slide 5: 5-Layer Anti-Proxy Protocol (Part 2)
 *   **Heading:** Layer 4-6: Continuity & Validation
 *   **Layers:**
     4.  **Campus Geofencing:** Ray-casting GPS validation against institutional boundaries.

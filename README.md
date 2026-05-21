@@ -3,9 +3,9 @@
 [![Platform](https://img.shields.io/badge/Platform-Android-green.svg)](https://developer.android.com/android)
 [![Architecture](https://img.shields.io/badge/Architecture-Clean%20%2B%20Modular-blue.svg)](https://developer.android.com/topic/architecture)
 [![Backend](https://img.shields.io/badge/Backend-Firebase-orange.svg)](https://firebase.google.com/)
-[![Security](https://img.shields.io/badge/Security-6--Layer%20Anti--Proxy-red.svg)]()
+[![Security](https://img.shields.io/badge/Security-5--Layer%20Anti--Proxy-red.svg)]()
 
-AcadMate Elite is an enterprise-grade academic management ecosystem designed to eliminate institutional friction. It integrates a **proprietary 6-layer anti-proxy attendance protocol** with a **context-aware AI Learning Suite**, providing a unified, production-ready infrastructure for Administrators, Faculty, and Students. 
+AcadMate Elite is an enterprise-grade academic management ecosystem designed to eliminate institutional friction. It integrates a **proprietary 5-layer anti-proxy attendance protocol** with a **context-aware AI Learning Suite**, providing a unified, production-ready infrastructure for Administrators, Faculty, and Students. 
 
 This multi-module Android application handles the end-to-end lifecycle of a higher education institution, from deep curriculum building to automated grading, all driven by a real-time Firestore backend.
 
@@ -18,15 +18,14 @@ You can download the latest production-ready APK from the link below:
 
 ---
 
-## 🔐 The 6-Layer Anti-Proxy Protocol
-AcadMate Elite solves the "Proxy Problem" in institutional settings through a mandatory 6-layer verification stack that makes marking attendance for a friend statistically and practically impossible.
+## 🔐 The 5-Layer Anti-Proxy Protocol
+AcadMate Elite solves the "Proxy Problem" in institutional settings through a mandatory 5-layer verification stack that makes marking attendance for a friend statistically and practically impossible.
 
 1.  **Hardware-Level Binding (Layer 1)**: Each account is cryptographically locked to a single `ANDROID_ID`. "Phone passing" is impossible without Admin approval.
 2.  **Acouximity (Layer 2)**: Uses **continuous infinite-looping** near-ultrasonic handshakes (18.5kHz) to prove the device is physically located within the classroom.
 3.  **ML Face Liveness (Layer 3)**: Uses Google ML Kit to detect natural blinks and micro-movements. **Mandatory Profile Photo** enrollment ensures biometric integrity.
 4.  **Campus Geofencing (Layer 4)**: High-precision GPS validation with real-time distance feedback (e.g., "Off-campus: 120m away") ensures the user is within institutional boundaries.
-5.  **Continuous Presence Monitoring (Layer 5)**: A foreground service maintains a secure connection and location heartbeats throughout the lecture duration.
-6.  **App Integrity (Layer 6)**: Integration with **Google Play Integrity API** ensures that only un-tampered, genuine app instances can communicate with the backend.
+5.  **App Integrity (Layer 5)**: Integration with **Google Play Integrity API** ensures that only un-tampered, genuine app instances can communicate with the backend.
 
 ---
 

@@ -7,7 +7,7 @@
 
 ## Slide 1: The Vision
 *   **Headline:** AcadMate: The Elite Academic Operating System.
-*   **Subtext:** Eliminating Institutional Friction through 6-Layer Security and Contextual AI.
+*   **Subtext:** Eliminating Institutional Friction through 5-Layer Security and Contextual AI.
 *   **Visual Representation:** 
     *   **Abstract HUD Background:** A subtle, animated digital grid in the background.
     *   **Centerpiece:** The AcadMate logo glowing in the center with a circular "Scanning" pulse effect (representing precision).
@@ -39,7 +39,7 @@
 
 ---
 
-## Slide 4: The 6-Layer Anti-Proxy Protocol (I)
+## Slide 4: The 5-Layer Anti-Proxy Protocol (I)
 *   **Headline:** Layer 1-3: Hardware & Proximity.
 *   **Layers:**
     1.  **Hardware Binding:** Account locked to a single device UID.
@@ -52,7 +52,7 @@
 
 ---
 
-## Slide 5: The 6-Layer Anti-Proxy Protocol (II)
+## Slide 5: The 5-Layer Anti-Proxy Protocol (II)
 *   **Headline:** Layer 4-6: Perimeter & Continuity.
 *   **Layers:**
     4.  **Campus Geofencing:** Polygon ray-casting GPS validation.
