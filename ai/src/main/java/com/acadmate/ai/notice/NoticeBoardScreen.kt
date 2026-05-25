@@ -20,7 +20,17 @@ import com.acadmate.designsystem.theme.LocalSpacing
 import com.acadmate.core.db.NoticeEntity
 import com.acadmate.attendance.domain.AttendanceViewModel
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withLink
 import java.util.*
+import java.util.regex.Pattern
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,8 +49,8 @@ fun NoticeBoardScreen(
     if (showPostDialog) {
         PostNoticeDialog(
             onDismiss = { showPostDialog = false },
-            onPost = { title, content ->
-                viewModel.postNotice(title, content)
+            onPost = { title, content, attachmentUrl ->
+                viewModel.postNotice(title, content, attachmentUrl)
                 showPostDialog = false
             },
             isPosting = isPosting
@@ -110,11 +120,12 @@ fun NoticeBoardScreen(
 @Composable
 fun PostNoticeDialog(
     onDismiss: () -> Unit,
-    onPost: (String, String) -> Unit,
+    onPost: (String, String, String?) -> Unit,
     isPosting: Boolean
 ) {
     var title by remember { mutableStateOf("") }
     var content by remember { mutableStateOf("") }
+    var attachmentUrl by remember { mutableStateOf("") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -135,12 +146,18 @@ fun PostNoticeDialog(
                     singleLine = false,
                     modifier = Modifier.height(150.dp)
                 )
+                AcadMateTextField(
+                    value = attachmentUrl,
+                    onValueChange = { attachmentUrl = it },
+                    label = "Attachment URL (Optional)",
+                    placeholder = "e.g. https://link.to/document.pdf"
+                )
             }
         },
         confirmButton = {
             AcadMateButton(
                 text = "Broadcast",
-                onClick = { onPost(title, content) },
+                onClick = { onPost(title, content, attachmentUrl.ifBlank { null }) },
                 enabled = title.isNotBlank() && content.isNotBlank() && !isPosting,
                 loading = isPosting
             )
@@ -153,6 +170,42 @@ fun PostNoticeDialog(
 
 @Composable
 fun NoticeCard(notice: NoticeEntity) {
+    val uriHandler = LocalUriHandler.current
+    val annotatedContent = remember(notice.content) {
+        buildAnnotatedString {
+            val content = notice.content
+            append(content)
+            
+            val urlPattern = Pattern.compile(
+                "(?:^|[\\s])((https?://|www\\.)[\\w-]+(?:\\.[\\w-]+)+(?:[\\w.,@?^=%&:/~+#-]*[\\w@?^=%&/~+#-])?)",
+                Pattern.CASE_INSENSITIVE
+            )
+            val matcher = urlPattern.matcher(content)
+            
+            while (matcher.find()) {
+                val start = matcher.start(1)
+                val end = matcher.end(1)
+                val url = matcher.group(1) ?: ""
+                
+                val fullUrl = if (url.startsWith("http")) url else "https://$url"
+                
+                addLink(
+                    url = LinkAnnotation.Url(
+                        url = fullUrl,
+                        styles = TextLinkStyles(
+                            style = SpanStyle(
+                                color = Color(0xFF0984E3),
+                                textDecoration = TextDecoration.Underline
+                            )
+                        )
+                    ),
+                    start = start,
+                    end = end
+                )
+            }
+        }
+    }
+
     AcadMateCard(variant = CardVariant.Elevated) {
         Column(modifier = Modifier.padding(20.dp)) {
             Row(
@@ -176,12 +229,28 @@ fun NoticeCard(notice: NoticeEntity) {
             Spacer(modifier = Modifier.height(16.dp))
             Text(notice.title, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleLarge, letterSpacing = (-0.5).sp)
             Spacer(modifier = Modifier.height(8.dp))
+            
             Text(
-                notice.content, 
+                text = annotatedContent,
                 style = MaterialTheme.typography.bodyMedium, 
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 lineHeight = 20.sp
             )
+
+            val attachmentUrl = notice.attachmentUrl
+            if (!attachmentUrl.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(16.dp))
+                OutlinedButton(
+                    onClick = { uriHandler.openUri(attachmentUrl) },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                ) {
+                    Icon(Icons.Default.Attachment, null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("View Attachment", style = MaterialTheme.typography.labelLarge)
+                }
+            }
             
             Spacer(modifier = Modifier.height(20.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))

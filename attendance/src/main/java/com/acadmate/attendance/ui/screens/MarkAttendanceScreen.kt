@@ -56,6 +56,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.acadmate.attendance.data.AttendanceUiState
@@ -503,7 +504,11 @@ fun Step2FaceDetection(
                 ) {
                     if (profilePhoto != null) {
                         AsyncImage(
-                            model = profilePhoto,
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(profilePhoto)
+                                .crossfade(true)
+                                .size(512)
+                                .build(),
                             contentDescription = "Reference",
                             contentScale = ContentScale.Crop
                         )

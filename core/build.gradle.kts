@@ -59,5 +59,6 @@ dependencies {
     // WorkManager
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.androidx.hilt.work)
+    implementation(libs.zxing.core)
     ksp(libs.androidx.hilt.compiler)
 }

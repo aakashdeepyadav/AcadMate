@@ -14,21 +14,22 @@ import kotlinx.serialization.json.Json
 import javax.inject.Inject
 
 data class Question(
-    val id: String,
-    val text: String,
-    val options: List<String>,
-    val correctIndex: Int,
-    val explanation: String,
+    val id: String = "",
+    val text: String = "",
+    val options: List<String> = emptyList(),
+    val correctIndex: Int = 0,
+    val explanation: String = "",
     val topic: String = "General",
     var selectedIndex: Int? = null
 )
 
 data class ExamResult(
-    val score: Int,
-    val total: Int,
-    val strongTopics: List<String>,
-    val weakTopics: List<String>,
-    val questions: List<Question>
+    val score: Int = 0,
+    val total: Int = 0,
+    val subject: String = "",
+    val strongTopics: List<String> = emptyList(),
+    val weakTopics: List<String> = emptyList(),
+    val questions: List<Question> = emptyList()
 )
 
 sealed class ExamUiState {
@@ -73,6 +74,11 @@ class MockExamViewModel @Inject constructor(
     val userRole: StateFlow<com.acadmate.core.model.UserRole?> = onboardingDataStore.selectedRole
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
+    val currentUserId: String? get() = auth.currentUser?.uid
+
+    private var activeSubject: String = ""
+    private var activeQuizId: String? = null
+    private var activeFacultyId: String? = null
     private var timerJob: Job? = null
 
     init {
@@ -134,6 +140,9 @@ class MockExamViewModel @Inject constructor(
     }
 
     fun startPublishedQuiz(quiz: PublishedQuiz) {
+        activeSubject = quiz.subject
+        activeQuizId = quiz.id
+        activeFacultyId = quiz.facultyId
         _uiState.value = ExamUiState.Ongoing(quiz.questions, 0)
         startTimer(20 * 60) // Default 20 mins for published quizzes
     }
@@ -143,18 +152,26 @@ class MockExamViewModel @Inject constructor(
             _uiState.value = ExamUiState.Loading
             
             try {
-                val matchedSyllabus = _availableSubjects.value
-                    .find { it.subjectName.equals(subject, ignoreCase = true) }
+                // Fetch the latest syllabus directly from Firestore for this subject to ensure dynamic content
+                val snapshot = firestore.collection("syllabuses")
+                    .whereEqualTo("subjectName", subject)
+                    .get()
+                    .await()
+                
+                val matchedSyllabus = snapshot.toObjects(com.acadmate.core.model.SubjectSyllabus::class.java).firstOrNull()
+                    ?: _availableSubjects.value.find { it.subjectName.equals(subject, ignoreCase = true) }
                 
                 val syllabusContext = matchedSyllabus?.let {
-                    "Use the following topics from the official syllabus for this subject:\n" +
+                    "Use the following topics from the official database syllabus for this subject:\n" +
                     it.units.joinToString("\n") { unit -> "- ${unit.title}: ${unit.topics.joinToString()}" }
                 } ?: ""
 
                 val prompt = """
                     Generate a practice exam for the subject '$subject' with difficulty '$difficulty'.
+                    DATABASE SYLLABUS CONTEXT:
                     $syllabusContext
-                    Provide exactly $count multiple choice questions.
+                    
+                    Provide exactly $count multiple choice questions based on the topics above.
                     Return the result as a JSON array of objects with these fields:
                     - text: the question text
                     - options: a list of 4 possible answers
@@ -193,6 +210,9 @@ class MockExamViewModel @Inject constructor(
                 if (shouldPublish) {
                     publishQuiz(subject, difficulty, questions)
                 } else {
+                    activeSubject = subject
+                    activeQuizId = null
+                    activeFacultyId = null
                     _uiState.value = ExamUiState.Ongoing(questions, 0)
                     timeLimit?.let {
                         startTimer(it * 60)
@@ -255,17 +275,18 @@ class MockExamViewModel @Inject constructor(
             val result = ExamResult(
                 score = score,
                 total = questions.size,
+                subject = activeSubject,
                 strongTopics = strongTopics,
                 weakTopics = weakTopics,
                 questions = questions
             )
             
-            saveResultToFirestore(result)
+            saveResultToFirestore(result, activeQuizId, activeFacultyId)
             _uiState.value = ExamUiState.Finished(result)
         }
     }
 
-    private fun saveResultToFirestore(result: ExamResult) {
+    private fun saveResultToFirestore(result: ExamResult, quizId: String?, facultyId: String?) {
         val userId = auth.currentUser?.uid ?: return
         
         viewModelScope.launch {
@@ -276,6 +297,9 @@ class MockExamViewModel @Inject constructor(
                 val examData = hashMapOf(
                     "userId" to userId,
                     "studentName" to studentName,
+                    "subject" to result.subject,
+                    "quizId" to (quizId ?: ""),
+                    "facultyId" to (facultyId ?: ""),
                     "score" to result.score,
                     "total" to result.total,
                     "percentage" to (result.score.toFloat() / result.total) * 100,

@@ -13,5 +13,6 @@ data class NoticeEntity(
     val title: String,
     val content: String,
     val date: String,
-    val timestamp: Long
+    val timestamp: Long,
+    val attachmentUrl: String? = null
 )

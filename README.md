@@ -1,112 +1,101 @@
-# <img src="app/src/main/res/drawable/acadmate.png" width="48" valign="middle"> AcadMate: The Elite Academic Operating System
+# 🎓 AcadMate: The Ultimate AI-Powered Campus ERP
 
-[![Platform](https://img.shields.io/badge/Platform-Android-green.svg)](https://developer.android.com/android)
-[![Architecture](https://img.shields.io/badge/Architecture-Clean%20%2B%20Modular-blue.svg)](https://developer.android.com/topic/architecture)
-[![Backend](https://img.shields.io/badge/Backend-Firebase-orange.svg)](https://firebase.google.com/)
-[![Security](https://img.shields.io/badge/Security-5--Layer%20Anti--Proxy-red.svg)]()
+**Current Version: v1.3.0**
 
-AcadMate Elite is an enterprise-grade academic management ecosystem designed to eliminate institutional friction. It integrates a **proprietary 5-layer anti-proxy attendance protocol** with a **context-aware AI Learning Suite**, providing a unified, production-ready infrastructure for Administrators, Faculty, and Students. 
-
-This multi-module Android application handles the end-to-end lifecycle of a higher education institution, from deep curriculum building to automated grading, all driven by a real-time Firestore backend.
+AcadMate is a cutting-edge, comprehensive institutional management system designed to streamline college operations through AI and real-time data. Built with a modern tech stack (Kotlin, Jetpack Compose, Firebase), it provides specialized portals for Administrators, Faculty, and Students.
 
 ---
 
-## 📱 Download Latest APK
-You can download the latest production-ready APK from the link below:
+## 🚀 Key Modules & Features
 
-[**⬇️ Download AcadMate v1.2.0-Elite**](https://github.com/aakashdeepyadav/AcadMate/releases/download/v1.2.0/AcadMate-v1.2.0.apk)
+### 🏛️ Institutional Admin Portal
+*   **System Command Center**: Centralized dashboard with real-time stats on students, faculty, and system health.
+*   **Campus Configuration**: 
+    *   **Geofencing**: Set precise GPS coordinates and radius for secure, location-based attendance.
+    *   **Academic Cycle**: One-click management of current semesters (S1-S8).
+    *   **Structural Setup**: Manage departments, sections, and subject assignments.
+*   **Community Management**: Create moderated class groups and monitor institutional activity.
+*   **Audit Logs**: Comprehensive tracking of all administrative actions for transparency.
 
----
+### 🍎 Faculty Portal (The Teaching Suite)
+*   **Smart Attendance**: Start ultrasonic or QR-based beacons for secure, proxy-proof attendance.
+*   **Lecture Logs**: Digital "Daily Diary" to record topics covered and unit-wise progress.
+*   **Student Analytics**: Identify "At-Risk" students (low attendance/scores) for early intervention.
+*   **Moderated Communication**: Administer class groups and appoint up to 2 Class Representatives (CRs) for message moderation.
+*   **Resource Manager**: Upload and manage study materials, assignments, and gradebooks.
 
-## 🔐 The 5-Layer Anti-Proxy Protocol
-AcadMate Elite solves the "Proxy Problem" in institutional settings through a mandatory 5-layer verification stack that makes marking attendance for a friend statistically and practically impossible.
-
-1.  **Hardware-Level Binding (Layer 1)**: Each account is cryptographically locked to a single `ANDROID_ID`. "Phone passing" is impossible without Admin approval.
-2.  **Acouximity (Layer 2)**: Uses **continuous infinite-looping** near-ultrasonic handshakes (18.5kHz) to prove the device is physically located within the classroom.
-3.  **ML Face Liveness (Layer 3)**: Uses Google ML Kit to detect natural blinks and micro-movements. **Mandatory Profile Photo** enrollment ensures biometric integrity.
-4.  **Campus Geofencing (Layer 4)**: High-precision GPS validation with real-time distance feedback (e.g., "Off-campus: 120m away") ensures the user is within institutional boundaries.
-5.  **App Integrity (Layer 5)**: Integration with **Google Play Integrity API** ensures that only un-tampered, genuine app instances can communicate with the backend.
-
----
-
-## 🏛️ Comprehensive Role-Based Ecosystem
-
-AcadMate adapts its entire interface and permission set based on the institutional role. All roles are unified under a single **Registration Number (regNo)** identity system + **OTP Phone Authentication** (with smart-lookup fallback) for 100% data consistency.
-
-### 1. Institutional Administrator (The Command Center)
-The Admin portal is designed for high-level oversight and system integrity.
-*   **User Governance**: Full CRUD lifecycle management including **Edit User Info** capabilities. Admins create profiles (Students, Faculty) and manage roles.
-*   **Centralized Syllabus Management**: Define the master curriculum with multi-unit structures and specific topics. Changes propagate instantly to all roles.
-*   **Smart AI Scheduler**: Generate optimized timetables using **Gemini AI** with support for **Natural Language Suggestions** (e.g., "No labs on Monday") and **Room Inventory** management.
-*   **Institutional Pulse**: A real-time dashboard displaying campus-wide active sessions, **actual average attendance**, and pending security anomalies.
-
-### 2. Faculty (The Classroom Orchestrator)
-A suite of tools designed to reduce administrative load and maximize teaching time.
-*   **Live Attendance Pulse**: Initiate secure sessions and view a **real-time presence list** of students as they mark themselves present.
-*   **Manual Override**: Faculty can manually toggle attendance for any student, providing a reliable fallback for technical or environmental edge cases.
-*   **Teaching Schedule**: A personalized daily timetable showing exactly when and where their next classes are scheduled.
-*   **Dynamic Dashboard**: Real-time analytics on personal teaching load, average session attendance, and active assignment counts.
-
-### 3. Student (The Intelligent Learner)
-A personal companion that handles the "mechanics" of college life, allowing the student to focus on learning.
-*   **Smart Auto-Alarm**: Automatically schedules a high-priority system alarm **dynamic minutes before the first class** of the day.
-*   **Alarm Customization**: Students can modify alarm volume, vibration, and tones within the Manage Notifications suite.
-*   **Academic Hub**: Instant access to real-time Timetables, Assignments, **Syllabus Progress**, and Campus Notices.
-*   **Elite Scholar Aesthetic**: Deep-indigo premium interface featuring a visual Attendance Hero and interactive GPA Simulator.
+### 🎓 Student Portal (The Learning Hub)
+*   **AI Tutor**: 24/7 academic assistance with Markdown and code-block support (powered by Gemini).
+*   **Digital ID Card**: Premium identity card with a dynamic QR code for campus services.
+*   **Campus Life Hub**:
+    *   **Hostel & Mess**: View real-time mess menus and apply for digital outpasses.
+    *   **Placement Hub**: Browse job/internship listings with package (LPA) and location details.
+    *   **Digital Library**: Search books, track issued items, and monitor due dates.
+*   **Academic Dashboard**: Track attendance percentages, upcoming deadlines, and CGPA estimates.
+*   **Moderated Groups**: Engage in class communities where content is filtered by CRs/Faculty for quality.
 
 ---
 
-## 🛰️ High-Performance Features
-*   **Room DB Offline Engine**: Instant access to Timetables, Assignments, Syllabuses, and Results even without internet connectivity.
-*   **Secure Biometric Unlock**: Protect sensitive academic data with Android Biometric (Face/Fingerprint) integration.
-*   **Intelligent AI Suite**: Includes a Tech Interview Prep mode, Study Planner, and AI Summarizer for lecture audio.
+## 🛠️ Technical Architecture
+
+### Tech Stack
+*   **Language**: Kotlin
+*   **UI Framework**: Jetpack Compose (100%)
+*   **Architecture**: MVVM (Model-View-ViewModel) + Clean Architecture
+*   **Dependency Injection**: Hilt (Dagger)
+*   **Database**: 
+    *   **Remote**: Firebase Firestore (Real-time sync)
+    *   **Local**: Room DB (Offline support)
+*   **Authentication**: Firebase Auth (Phone + OTP, Email/Password)
+*   **AI Engine**: Google Generative AI (Gemini 3.1 Flash)
+*   **Image Loading**: Coil
+*   **Networking**: Ktor
+
+### Security Features
+*   **Package Visibility**: Fully compliant with Android 11+ requirements.
+*   **App Check**: Integrated Play Integrity for secure backend communication.
+*   **Moderation Engine**: Multi-tier approval flow for student-generated content in community groups.
 
 ---
 
-## 🛠️ Technology & Architecture
-
-### **Advanced Core Stack**
-*   **UI Engine**: 100% Jetpack Compose using Material Design 3 guidelines.
-*   **AI Integration**: Firebase Vertex AI / Gemini Pro API for **Natural Language Scheduling** and Intelligent Tutoring.
-*   **Security Stack**: Android Biometric API + Google Play Integrity API + Acoustic Signal Processing.
-*   **State Management**: MVVM Architecture with Kotlin Flow/StateFlow for reactive UI updates.
-*   **Persistence**: Room Database for robust **Offline-First** capability.
-
-### **9-Module Scalable Architecture**
-- `:app`: Main entry point, role-aware navigation graphs, and application shell.
-- `:auth`: Identity management, OTP Verification (Smart-Lookup), and User creation flows.
-- `:attendance`: The 5-layer verification engine, infinite acoustic processing, and geofencing.
-- `:ai`: Learning suite, Gemini-driven scheduling, and audio-to-text summarization.
-- `:dashboard`: Specialized Home, Profile, and **Timetable** screens for all roles.
-- `:admin`: Institutional management tools (Timetables, **Master Syllabus**, Courses).
-- `:assignments`: Grading system, Gradebook, student submissions, and Resource Manager.
-- `:designsystem`: Unified "Academic Precision" UI library (Buttons, Cards, Themes).
-- `:core`: Shared entities, database repositories, **Alarm Schedulers**, and networking utilities.
+## 📂 Project Structure
+```text
+├── admin/            # Institutional management & configuration
+├── ai/               # AI Tutor, Syllabus parser, and Exam simulation
+├── app/              # Navigation, Splash, and Application core
+├── assignments/      # Task management and Resource sharing
+├── attendance/       # Secure geofenced attendance engine
+├── auth/             # Multi-role authentication & profile setup
+├── core/             # Shared data models, database, and utilities
+├── dashboard/        # Role-specific Home screens & Campus services
+└── designsystem/     # Reusable UI components, themes, and animations
+```
 
 ---
 
-## 🚀 Deployment & Developer Setup
+## ⚙️ Setup & Installation
 
-### **Mandatory Configuration**
-1.  **Clone the Repository**: `git clone https://github.com/aakashdeepyadav/AcadMate.git`
-2.  **API Keys**: Add `GEMINI_API_KEY=your_gemini_key` to your `local.properties` file.
-3.  **Firebase Setup**: 
-    *   Add your `google-services.json` to the `app/` folder.
-    *   Enable **Phone Authentication** (OTP) and **Firestore Database**.
-4.  **Integrity API**: Enable **Play Integrity API** in the Google Cloud Console for Anti-Proxy features.
-
-### **Institutional Test Credentials**
-The system enforces **Two-Step Verification (Password + OTP)** for all accounts.
-
-| Role | ID (Registration No.) | Password | MFA Requirement |
-| :--- | :--- | :--- | :--- |
-| **Student** | `12345678` | `Password@123` | Phone OTP |
-| **Faculty** | `100001` | `Password@123` | Phone OTP |
-| **Admin** | `9001` | `Password@123` | Phone OTP |
+1.  **Clone the Repository**:
+    ```bash
+    git clone https://github.com/yourusername/AcadMate.git
+    ```
+2.  **Firebase Configuration**:
+    *   Add your `google-services.json` to the `/app` directory.
+    *   Enable Firestore, Auth (Phone/Email), and Storage.
+3.  **Local Configuration**:
+    *   Add your `GEMINI_API_KEY` to `local.properties`.
+4.  **SHA-1 Registration**:
+    *   Generate your SHA-1 using `./gradlew signingReport`.
+    *   Register the fingerprint in your Firebase Console to enable OTP and App Check.
 
 ---
-## ⚠️ Security Notice
-This repository excludes sensitive configuration files such as `google-services.json` and `local.properties`. You **must** provide your own Firebase configuration to make the app functional.
+
+## 🗺️ Roadmap
+- [ ] **Fee Payment Integration**: Stripe/Razorpay SDK implementation.
+- [ ] **Clubs & Communities**: Dedicated pages for college societies.
+- [ ] **Push Notifications**: Real-time alerts for attendance and announcements.
+- [ ] **Offline Mode**: Enhanced Room caching for low-connectivity campus areas.
 
 ---
-*Built for the next generation of academic excellence. Smart India Hackathon 2025.*
+
+**AcadMate** is more than an app; it's a digital transformation for your institution. 🚀

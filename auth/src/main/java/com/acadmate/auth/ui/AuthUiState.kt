@@ -12,4 +12,10 @@ sealed class AuthUiState {
     data class RequirePhoneInput(val userId: String, val maskedPhone: String) : AuthUiState()
     data class PasswordResetSent(val message: String) : AuthUiState()
     data class ForcePasswordChange(val userId: String) : AuthUiState()
+    
+    // New states for profile updates
+    data class UpdateOtpSent(val target: String, val type: UpdateType) : AuthUiState()
+    data class UpdateSuccess(val message: String) : AuthUiState()
 }
+
+enum class UpdateType { PHONE, EMAIL }

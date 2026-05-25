@@ -112,6 +112,45 @@ sealed class Routes {
     object NoticeBoard
 
     @Serializable
+    object LectureLogs
+
+    @Serializable
+    object PerformanceAnalytics
+
+    @Serializable
+    object DigitalIdCard
+
+    @Serializable
+    object PlacementHub
+
+    @Serializable
+    object CampusEvents
+
+    @Serializable
+    object HostelManagement
+
+    @Serializable
+    object DigitalLibrary
+
+    @Serializable
+    object FeePayment
+
+    @Serializable
+    object CampusClubs
+
+    @Serializable
+    object CommunityGroups
+
+    @Serializable
+    object FacultyCommunity
+
+    @Serializable
+    object ManageCommunity
+
+    @Serializable
+    data class GroupChat(val groupId: String)
+
+    @Serializable
     object AdminGraph
 
     @Serializable
@@ -125,6 +164,15 @@ sealed class Routes {
 
     @Serializable
     object AuditLog
+
+    @Serializable
+    object AdminLeaveRequests
+
+    @Serializable
+    object AdminEvents
+
+    @Serializable
+    object AdminAnalytics
 
     @Serializable
     object AssignmentGraph
@@ -149,6 +197,9 @@ sealed class Routes {
 
     @Serializable
     data class ResetPassword(val userId: String)
+
+    @Serializable
+    object UpdateProfile
 
     @Serializable
     object Results

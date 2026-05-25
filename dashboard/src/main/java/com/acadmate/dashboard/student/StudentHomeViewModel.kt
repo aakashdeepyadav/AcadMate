@@ -28,6 +28,7 @@ data class HomeUiState(
     val studentPhone: String = "",
     val studentEnrollment: String = "",
     val studentDepartment: String = "",
+    val studentSection: String = "",
     val studentRole: String = "",
     val studentAddress: String = "N/A",
     val attendancePercentage: Float = 0f,
@@ -40,6 +41,9 @@ data class HomeUiState(
     val insights: List<AiInsight> = emptyList(),
     val deadlines: List<Deadline> = emptyList(),
     val courseProgress: Map<String, Float> = emptyMap(),
+    val attendanceStreak: Int = 0,
+    val taskCount: Int = 0,
+    val events: List<com.acadmate.core.model.CampusEvent> = emptyList(),
     val profilePictureUrl: String? = null,
     val smartSuggestion: String? = "Stay ahead! Review your syllabus progress today.",
     val freeTimeUtilization: String? = null
@@ -129,6 +133,7 @@ class StudentHomeViewModel @Inject constructor(
                         studentPhone = user.phoneNumber,
                         studentEnrollment = user.regNo ?: "N/A",
                         studentDepartment = user.department ?: "General",
+                        studentSection = user.section ?: "N/A",
                         studentRole = user.role.name,
                         studentAddress = user.address ?: "N/A",
                         profilePictureUrl = user.profilePictureUrl
@@ -246,6 +251,37 @@ class StudentHomeViewModel @Inject constructor(
                 val progressMap = attendanceTask.documents.groupBy { it.getString("subject") ?: "Other" }
                     .mapValues { (_, records) -> (records.size / 24f).coerceIn(0f, 1f) }
 
+                // Fetch real task count (pending submissions)
+                val submissionsTask = firestore.collection("assignment_submissions")
+                    .whereEqualTo("studentId", regNo)
+                    .get()
+                    .await()
+                
+                val submittedIds = submissionsTask.documents.mapNotNull { it.getString("assignmentId") }.toSet()
+                val totalAssignmentsSnapshot = firestore.collection("assignments").get().await()
+                val pendingTasksCount = totalAssignmentsSnapshot.size() - submittedIds.size
+
+                // Calculate Dynamic Attendance Streak
+                val streak = calculateStreak(attendanceTask.documents)
+
+                // Fetch real events for students
+                val eventsSnapshot = firestore.collection("events")
+                    .whereGreaterThanOrEqualTo("endDate", System.currentTimeMillis())
+                    .get()
+                    .await()
+                
+                val realEvents = eventsSnapshot.documents.mapNotNull { doc ->
+                    com.acadmate.core.model.CampusEvent(
+                        id = doc.id,
+                        title = doc.getString("title") ?: "",
+                        description = doc.getString("description") ?: "",
+                        startDate = doc.getLong("startDate") ?: 0L,
+                        endDate = doc.getLong("endDate") ?: 0L,
+                        location = doc.getString("location") ?: "",
+                        type = doc.getString("type") ?: "ACADEMIC"
+                    )
+                }
+
                 _uiState.value = _uiState.value.copy(
                     attendancePercentage = attendancePercentage,
                     currentClass = currentClassDisplay,
@@ -254,6 +290,9 @@ class StudentHomeViewModel @Inject constructor(
                     deadlines = deadlines,
                     schedule = todaySchedule,
                     courseProgress = progressMap,
+                    attendanceStreak = streak,
+                    taskCount = pendingTasksCount.coerceAtLeast(0),
+                    events = realEvents,
                     isRefreshing = false,
                     smartSuggestion = if (activeSession != null) "A live session for ${activeSession.getString("classId")} is active. Mark your attendance now!" else "Stay ahead! Review your syllabus progress today."
                 )
@@ -266,6 +305,52 @@ class StudentHomeViewModel @Inject constructor(
     private fun formatTimestamp(timestamp: Long): String {
         val sdf = SimpleDateFormat("MMM dd", Locale.getDefault())
         return sdf.format(Date(timestamp))
+    }
+
+    private fun calculateStreak(attendanceDocs: List<com.google.firebase.firestore.DocumentSnapshot>): Int {
+        if (attendanceDocs.isEmpty()) return 0
+
+        val sdf = SimpleDateFormat("yyyy-M-d", Locale.getDefault())
+        val attendanceDates = attendanceDocs.mapNotNull { it.getString("date") }
+            .mapNotNull { 
+                try { sdf.parse(it) } catch (e: Exception) { null }
+            }
+            .map { 
+                val cal = Calendar.getInstance()
+                cal.time = it
+                cal.set(Calendar.HOUR_OF_DAY, 0)
+                cal.set(Calendar.MINUTE, 0)
+                cal.set(Calendar.SECOND, 0)
+                cal.set(Calendar.MILLISECOND, 0)
+                cal.timeInMillis 
+            }
+            .distinct()
+            .sortedDescending()
+
+        if (attendanceDates.isEmpty()) return 0
+
+        val today = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+
+        val yesterday = today - 86400000L
+
+        // Streak only counts if they attended today or yesterday
+        if (attendanceDates[0] < yesterday) return 0
+
+        var currentStreak = 1
+        for (i in 0 until attendanceDates.size - 1) {
+            val diff = attendanceDates[i] - attendanceDates[i + 1]
+            if (diff <= 86400000L) { // 1 day difference (allowing for multiple sessions same day)
+                currentStreak++
+            } else {
+                break
+            }
+        }
+        return currentStreak
     }
 
     fun dismissInsight(id: String) {

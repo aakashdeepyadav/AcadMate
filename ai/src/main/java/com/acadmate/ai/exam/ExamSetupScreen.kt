@@ -49,6 +49,8 @@ fun ExamSetupScreen(
 
     var searchQuery by remember { mutableStateOf("") }
     var selectedTab by remember { mutableIntStateOf(0) }
+    val uiState by viewModel.uiState.collectAsState()
+    val isGenerating = uiState is ExamUiState.Loading
 
     Scaffold(
         topBar = {
@@ -183,28 +185,42 @@ fun ExamSetupScreen(
                                 shouldPublish = isFaculty
                             )
                         },
+                        enabled = !isGenerating,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp)
                     ) {
-                        Text(if (isFaculty) "Generate & Publish Quiz" else "Start Practice Quiz")
+                        if (isGenerating) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text("Generating Questions...")
+                        } else {
+                            Text(if (isFaculty) "Generate & Publish Quiz" else "Start Practice Quiz")
+                        }
                     }
                 }
             } else if (selectedTab == 1 && isFaculty) {
                 // Live Results Tab for Faculty
-                LiveQuizResultsList()
+                LiveQuizResultsList(viewModel.currentUserId)
             }
         }
     }
 }
 
 @Composable
-fun LiveQuizResultsList() {
+fun LiveQuizResultsList(facultyId: String?) {
     val firestore = com.google.firebase.firestore.FirebaseFirestore.getInstance()
     var results by remember { mutableStateOf<List<com.google.firebase.firestore.DocumentSnapshot>>(emptyList()) }
     
-    LaunchedEffect(Unit) {
+    LaunchedEffect(facultyId) {
+        if (facultyId == null) return@LaunchedEffect
+        
         firestore.collection("exam_results")
+            .whereEqualTo("facultyId", facultyId)
             .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
             .addSnapshotListener { snapshot, e ->
                 if (e != null) return@addSnapshotListener
@@ -247,7 +263,8 @@ fun LiveQuizResultsList() {
                         Text(doc.getString("studentName") ?: "Unknown Student", fontWeight = FontWeight.Bold)
                         val score = doc.getLong("score") ?: 0L
                         val total = doc.getLong("total") ?: 0L
-                        Text("Score: $score/$total (${doc.getDouble("percentage")?.toInt() ?: 0}%)", style = MaterialTheme.typography.bodySmall)
+                        val subject = doc.getString("subject") ?: "General"
+                        Text("$subject • Score: $score/$total (${doc.getDouble("percentage")?.toInt() ?: 0}%)", style = MaterialTheme.typography.bodySmall)
                     }
                     Text(
                         java.text.SimpleDateFormat("hh:mm a", java.util.Locale.getDefault()).format(java.util.Date(doc.getLong("timestamp") ?: 0L)),

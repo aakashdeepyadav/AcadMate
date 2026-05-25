@@ -24,7 +24,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.filled.Home
@@ -53,7 +55,7 @@ data class ProfileUiState(
 @Composable
 fun ProfileScreen(
     onBackClick: () -> Unit = {},
-    onEditClick: () -> Unit = {},
+    onEditSecurityClick: () -> Unit = {},
     onSignOut: () -> Unit = {},
     onNotificationsClick: () -> Unit = {},
     onPrivacyClick: () -> Unit = {},
@@ -126,6 +128,9 @@ fun ProfileScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = onEditSecurityClick) {
+                        Icon(Icons.Default.AdminPanelSettings, contentDescription = "Security", tint = MaterialTheme.colorScheme.primary)
+                    }
                     IconButton(onClick = { showEditDialog = true }) {
                         Icon(Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.primary)
                     }
@@ -168,7 +173,11 @@ fun ProfileScreen(
                             ) {
                                 if (uiState.profilePictureUrl != null) {
                                     AsyncImage(
-                                        model = uiState.profilePictureUrl,
+                                        model = ImageRequest.Builder(LocalContext.current)
+                                            .data(uiState.profilePictureUrl)
+                                            .crossfade(true)
+                                            .size(512)
+                                            .build(),
                                         contentDescription = "Profile Picture",
                                         modifier = Modifier.fillMaxSize(),
                                         contentScale = ContentScale.Crop

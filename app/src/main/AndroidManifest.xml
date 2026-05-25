@@ -41,9 +41,28 @@
 
     <queries>
         <package android:name="com.google.android.gms" />
+        <package android:name="com.google.android.gsf" />
         <package android:name="com.android.vending" />
         <intent>
             <action android:name="com.google.android.gms.auth.api.signin.SERVICE" />
+        </intent>
+        <intent>
+            <action android:name="com.google.android.gms.auth.api.phone.service.SmsRetrieverApiService.START" />
+        </intent>
+        <intent>
+            <action android:name="com.google.android.gms.common.api.GmsApiService.START" />
+        </intent>
+        <intent>
+            <action android:name="com.google.android.gms.fonts.DATA_SOURCE" />
+        </intent>
+        <intent>
+            <action android:name="com.google.android.gms.location.SETTINGS_API" />
+        </intent>
+        <intent>
+            <action android:name="com.google.android.play.core.integrity.service.BIND_INTEGRITY_SERVICE" />
+        </intent>
+        <intent>
+            <action android:name="com.google.android.gms.metadata.DATA_SOURCE" />
         </intent>
         <intent>
             <action android:name="com.google.firebase.dynamiclinks.service.START" />
@@ -73,7 +92,8 @@
 
         <meta-data
             android:name="com.google.android.gms.version"
-            android:value="@integer/google_play_services_version" />
+            android:value="@integer/google_play_services_version"
+            tools:replace="android:value" />
 
         <!-- Main Activity -->
         <activity

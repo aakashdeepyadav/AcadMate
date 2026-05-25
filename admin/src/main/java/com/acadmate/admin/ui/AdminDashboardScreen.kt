@@ -48,6 +48,10 @@ fun AdminDashboardScreen(
     onAiScheduleClick: () -> Unit = {},
     onAuditLogClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
+    onLeaveRequestsClick: () -> Unit = {},
+    onEventsClick: () -> Unit = {},
+    onAnalyticsClick: () -> Unit = {},
+    onCommunityClick: () -> Unit = {},
     onSignOut: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -68,8 +72,8 @@ fun AdminDashboardScreen(
     if (showAnnouncementDialog) {
         AnnouncementDialog(
             onDismiss = { showAnnouncementDialog = false },
-            onPost = { title, content ->
-                viewModel.postAnnouncement(title, content)
+            onPost = { title, content, attachmentUrl ->
+                viewModel.postAnnouncement(title, content, attachmentUrl)
                 showAnnouncementDialog = false
                 scope.launch {
                     snackbarHostState.showSnackbar("Announcement posted successfully")
@@ -207,6 +211,10 @@ fun AdminDashboardScreen(
                             onAuditLog = onAuditLogClick,
                             onSettingsClick = onSettingsClick,
                             onAiScheduleClick = onAiScheduleClick,
+                            onLeaveRequests = onLeaveRequestsClick,
+                            onEvents = onEventsClick,
+                            onAnalytics = onAnalyticsClick,
+                            onCommunity = onCommunityClick,
                             onComingSoon = { feature ->
                                 scope.launch {
                                     snackbarHostState.showSnackbar("$feature module coming soon")
@@ -260,16 +268,24 @@ fun QuickActionsGrid(
     onAuditLog: () -> Unit,
     onSettingsClick: () -> Unit,
     onAiScheduleClick: () -> Unit = {},
+    onLeaveRequests: () -> Unit = {},
+    onEvents: () -> Unit = {},
+    onAnalytics: () -> Unit = {},
+    onCommunity: () -> Unit = {},
     onComingSoon: (String) -> Unit
 ) {
     val actions = listOf(
         QuickAction("User Mgmt", Icons.Default.People, Color(0xFF6C5CE7), onAddUser),
         QuickAction("Course Mgmt", Icons.Default.Class, Color(0xFF00B894), onManageCourses),
-        QuickAction("Dept & Sections", Icons.Default.Settings, Color(0xFFE17055), onSettingsClick),
         QuickAction("Syllabus", Icons.Default.MenuBook, Color(0xFF0EA5E9), onSyllabus),
         QuickAction("Schedule", Icons.Default.CalendarMonth, Color(0xFFE17055), onSchedule),
         QuickAction("AI Scheduler", Icons.Default.AutoAwesome, Color(0xFF6C5CE7), onAiScheduleClick),
+        QuickAction("Community", Icons.Default.Groups, Color(0xFFE84393), onCommunity),
+        QuickAction("Leaves", Icons.Default.TimeToLeave, Color(0xFFF5A623), onLeaveRequests),
+        QuickAction("Events", Icons.Default.Event, Color(0xFF10B981), onEvents),
+        QuickAction("Analytics", Icons.Default.Insights, Color(0xFF9B59B6), onAnalytics),
         QuickAction("Announcements", Icons.Default.Campaign, Color(0xFF0984E3), onPostAnnouncement),
+        QuickAction("Settings", Icons.Default.Settings, Color(0xFF2D3436), onSettingsClick),
         QuickAction("Audit Logs", Icons.Default.Shield, Color(0xFF2D3436), onAuditLog)
     )
 
@@ -415,6 +431,9 @@ fun ActionItem(action: AdminAction) {
         ActionType.COURSE_ADDED -> Icons.Default.LibraryAdd to Color(0xFF0984E3)
         ActionType.ATTENDANCE_ANALYTICS_GENERATED -> Icons.Default.Insights to Color(0xFFF1C40F)
         ActionType.SYSTEM_ALERT -> Icons.Default.ReportProblem to Color(0xFFD63031)
+        ActionType.EVENT_CREATED -> Icons.Default.Event to Color(0xFF10B981)
+        ActionType.LEAVE_APPROVED -> Icons.Default.CheckCircle to Color(0xFF10B981)
+        ActionType.INFRASTRUCTURE_UPDATED -> Icons.Default.Business to Color(0xFF0EA5E9)
     }
 
     AcadMateCard(
@@ -477,10 +496,11 @@ fun ActionItem(action: AdminAction) {
 @Composable
 fun AnnouncementDialog(
     onDismiss: () -> Unit,
-    onPost: (String, String) -> Unit
+    onPost: (String, String, String?) -> Unit
 ) {
     var title by remember { mutableStateOf("") }
     var content by remember { mutableStateOf("") }
+    var attachmentUrl by remember { mutableStateOf("") }
 
     Dialog(onDismissRequest = onDismiss) {
         AcadMateCard(
@@ -512,6 +532,13 @@ fun AnnouncementDialog(
                     modifier = Modifier.height(120.dp),
                     singleLine = false
                 )
+
+                AcadMateTextField(
+                    value = attachmentUrl,
+                    onValueChange = { attachmentUrl = it },
+                    label = "Attachment URL (Optional)",
+                    placeholder = "e.g. https://example.com/file.pdf"
+                )
                 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -526,7 +553,7 @@ fun AnnouncementDialog(
                     
                     AcadMateButton(
                         text = "Post",
-                        onClick = { onPost(title, content) },
+                        onClick = { onPost(title, content, attachmentUrl.ifBlank { null }) },
                         modifier = Modifier.weight(1f),
                         enabled = title.isNotBlank() && content.isNotBlank()
                     )

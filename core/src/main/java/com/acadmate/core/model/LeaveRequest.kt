@@ -15,7 +15,9 @@ data class LeaveRequest(
     val status: LeaveStatus = LeaveStatus.PENDING,
     val createdAt: Long = System.currentTimeMillis(),
     val handledBy: String? = null,
-    val responseNote: String? = null
+    val responseNote: String? = null,
+    val attachmentUrl: String? = null, // URL for medical certificate or prescription
+    val medicalIssue: String? = null
 )
 
 enum class LeaveStatus {

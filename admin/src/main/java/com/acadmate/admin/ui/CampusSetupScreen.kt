@@ -36,6 +36,7 @@ fun CampusSetupScreen(
 
     val departments by viewModel.departments.collectAsState()
     val sections by viewModel.sections.collectAsState()
+    val currentSemester by viewModel.currentSemester.collectAsState()
     
     var newDeptName by remember { mutableStateOf("") }
     var newSectionName by remember { mutableStateOf("") }
@@ -97,6 +98,34 @@ fun CampusSetupScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
+            // Academic Cycle Section
+            Text("Academic Cycle", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            AcadMateCard {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Current Semester: $currentSemester", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                    
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        (1..8).chunked(4).forEach { semRow ->
+                            Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                semRow.forEach { sem ->
+                                    FilterChip(
+                                        selected = currentSemester == sem,
+                                        onClick = { viewModel.updateSemester(sem) },
+                                        label = { Text("S$sem") },
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    Text(
+                        "Updating the semester will affect attendance reporting and course availability across the platform.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
             // Geofence Section
             Text("Geofence & Location", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             AcadMateCard {

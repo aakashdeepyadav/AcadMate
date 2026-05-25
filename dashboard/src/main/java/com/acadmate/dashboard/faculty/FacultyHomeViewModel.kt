@@ -88,7 +88,13 @@ class FacultyHomeViewModel @Inject constructor(
                 .get()
                 .await()
             
-            val activeClassId = activeSessionsSnapshot.documents.firstOrNull()?.getString("classId")
+            val activeSessionDoc = activeSessionsSnapshot.documents.firstOrNull()
+            val activeClassId = activeSessionDoc?.getString("classId")
+            val sessionStartTime = activeSessionDoc?.getLong("startTime") ?: 0L
+            val currentTimeMillis = System.currentTimeMillis()
+            
+            // Session is valid only if it was started in the last 3 hours to avoid stale UI
+            val isSessionNotStale = (currentTimeMillis - sessionStartTime) < (3 * 60 * 60 * 1000)
 
             // 2. Fetch specific schedule for today from local Timetable
             val calendar = java.util.Calendar.getInstance()
@@ -104,16 +110,25 @@ class FacultyHomeViewModel @Inject constructor(
             }
 
             val todaySchedule = timetableRepository.getTimetableForDaySync(dayOfWeek)
+            val nowTime = String.format(java.util.Locale.getDefault(), "%02d:%02d", 
+                calendar.get(java.util.Calendar.HOUR_OF_DAY), 
+                calendar.get(java.util.Calendar.MINUTE))
             
             val classes = todaySchedule
                 .filter { it.faculty.contains(facultyName, ignoreCase = true) }
                 .map { entity ->
+                    // A class is considered "Live" if:
+                    // 1. It is explicitly active in Firestore and not stale
+                    // 2. OR it is currently within its scheduled time slot
+                    val isActiveInFirestore = (activeClassId == entity.id || activeClassId == entity.subject) && isSessionNotStale
+                    val isWithinTimeSlot = nowTime >= entity.startTime && nowTime <= entity.endTime
+                    
                     FacultyClass(
                         id = entity.id,
                         title = entity.subject,
                         time = "${entity.startTime} - ${entity.endTime}",
                         room = entity.room,
-                        isLive = activeClassId == entity.id || activeClassId == entity.subject
+                        isLive = isActiveInFirestore || isWithinTimeSlot
                     )
                 }
             

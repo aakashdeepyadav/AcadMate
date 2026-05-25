@@ -2,6 +2,7 @@ package com.acadmate.ai.tutor
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -13,6 +14,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -22,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -80,6 +85,7 @@ fun AiTutorScreen(
     }
 
     Scaffold(
+        contentWindowInsets = WindowInsets.ime, // Let Scaffold handle IME insets
         topBar = {
             TopAppBar(
                 title = { 
@@ -317,13 +323,14 @@ fun AiTutorScreen(
                 enter = slideInVertically { it } + fadeIn(),
                 exit = slideOutVertically { it } + fadeOut()
             ) {
-                Row(
+                LazyRow(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                        .padding(vertical = 8.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    suggestions.forEach { suggestion ->
+                    items(suggestions) { suggestion ->
                         SuggestionChip(
                             onClick = { 
                                 inputText = suggestion
@@ -352,40 +359,54 @@ fun AiTutorScreen(
 fun ChatBubble(message: ChatMessage) {
     val isUser = message.role == MessageRole.USER
     val alignment = if (isUser) Alignment.CenterEnd else Alignment.CenterStart
-    val backgroundColor = if (isUser) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
-    val textColor = if (isUser) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+    val backgroundColor = if (isUser) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
+    val textColor = if (isUser) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
     
     val shape = if (isUser) {
-        RoundedCornerShape(16.dp, 16.dp, 0.dp, 16.dp)
+        RoundedCornerShape(20.dp, 20.dp, 4.dp, 20.dp)
     } else {
-        RoundedCornerShape(16.dp, 16.dp, 16.dp, 0.dp)
+        RoundedCornerShape(20.dp, 20.dp, 20.dp, 4.dp)
     }
 
     Box(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
         contentAlignment = alignment
     ) {
         Column(
+            modifier = Modifier.widthIn(max = if (isUser) 320.dp else 360.dp),
             horizontalAlignment = if (isUser) Alignment.End else Alignment.Start
         ) {
             Surface(
                 color = backgroundColor,
                 shape = shape,
-                modifier = Modifier.widthIn(max = 300.dp)
+                tonalElevation = if (isUser) 0.dp else 2.dp,
+                shadowElevation = if (isUser) 2.dp else 1.dp,
+                border = if (isUser) null else BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
                     if (isUser) {
                         Text(
                             text = message.text,
                             color = textColor,
-                            fontSize = 15.sp
+                            style = MaterialTheme.typography.bodyLarge
                         )
                     } else {
-                        MarkdownText(
-                            markdown = message.text,
-                            modifier = Modifier.widthIn(max = 280.dp)
-                        )
+                        SelectionContainer {
+                            MarkdownText(
+                                markdown = message.text,
+                                modifier = Modifier.fillMaxWidth(),
+                                style = TextStyle(
+                                    color = textColor,
+                                    fontSize = 15.sp,
+                                    lineHeight = 22.sp
+                                )
+                            )
+                        }
                     }
+                    
+                    Spacer(Modifier.height(4.dp))
                     
                     Row(
                         modifier = Modifier.align(Alignment.End),
@@ -393,16 +414,16 @@ fun ChatBubble(message: ChatMessage) {
                     ) {
                         Text(
                             text = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(message.timestamp)),
-                            fontSize = 10.sp,
-                            color = textColor.copy(alpha = 0.7f)
+                            style = MaterialTheme.typography.labelSmall,
+                            color = textColor.copy(alpha = 0.6f)
                         )
                         if (isUser) {
                             Spacer(Modifier.width(4.dp))
                             Icon(
-                                Icons.Default.Done,
+                                Icons.Default.DoneAll,
                                 contentDescription = null,
-                                modifier = Modifier.size(12.dp),
-                                tint = textColor.copy(alpha = 0.7f)
+                                modifier = Modifier.size(14.dp),
+                                tint = textColor.copy(alpha = 0.6f)
                             )
                         }
                     }
@@ -414,19 +435,53 @@ fun ChatBubble(message: ChatMessage) {
 
 @Composable
 fun CodeBlock(text: String) {
-    // Simple code block rendering logic
+    val scrollState = rememberScrollState()
     Surface(
         color = Color(0xFF1E1E1E),
-        shape = RoundedCornerShape(8.dp),
-        modifier = Modifier.fillMaxWidth()
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        border = BorderStroke(1.dp, Color(0xFF333333))
     ) {
-        Text(
-            text = text.replace("```", ""),
-            color = Color(0xFFD4D4D4),
-            fontFamily = FontFamily.Monospace,
-            fontSize = 13.sp,
-            modifier = Modifier.padding(8.dp)
-        )
+        Column {
+            // Header for code block
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFF2D2D2D))
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Code Output",
+                    color = Color.Gray,
+                    style = MaterialTheme.typography.labelSmall
+                )
+                Icon(
+                    Icons.Default.ContentCopy,
+                    contentDescription = "Copy",
+                    tint = Color.Gray,
+                    modifier = Modifier.size(14.dp)
+                )
+            }
+            
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(scrollState)
+                    .padding(12.dp)
+            ) {
+                Text(
+                    text = text.replace("```", "").trim(),
+                    color = Color(0xFFD4D4D4),
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp
+                )
+            }
+        }
     }
 }
 
@@ -473,9 +528,7 @@ fun ChatInput(
     ) {
         Row(
             modifier = Modifier
-                .padding(8.dp)
-                .navigationBarsPadding()
-                .imePadding(),
+                .padding(8.dp),
             verticalAlignment = Alignment.Bottom
         ) {
             IconButton(onClick = { /* PDF Attachment Feature Coming Soon */ }) {

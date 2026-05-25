@@ -7,6 +7,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -16,6 +18,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -37,6 +40,7 @@ fun AppLockScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var pinInput by remember { mutableStateOf("") }
+    var pinVisible by remember { mutableStateOf(false) }
     var storedPin by remember { mutableStateOf<String?>(null) }
     var isError by remember { mutableStateOf(false) }
     
@@ -100,7 +104,15 @@ fun AppLockScreen(
                     }
                 }
             },
-            visualTransformation = PasswordVisualTransformation(),
+            visualTransformation = if (pinVisible) VisualTransformation.None else PasswordVisualTransformation(),
+            trailingIcon = {
+                IconButton(onClick = { pinVisible = !pinVisible }) {
+                    Icon(
+                        imageVector = if (pinVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                        contentDescription = if (pinVisible) "Hide PIN" else "Show PIN"
+                    )
+                }
+            },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
             modifier = Modifier.width(200.dp),
             textStyle = LocalTextStyle.current.copy(

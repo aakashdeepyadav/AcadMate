@@ -35,11 +35,11 @@ class NoticeBoardViewModel @Inject constructor(
         syncNotices()
     }
 
-    fun postNotice(title: String, content: String) {
+    fun postNotice(title: String, content: String, attachmentUrl: String? = null) {
         viewModelScope.launch {
             _isPosting.value = true
             try {
-                noticeRepository.postNotice(title, content)
+                noticeRepository.postNotice(title, content, attachmentUrl)
             } catch (e: Exception) {
             } finally {
                 _isPosting.value = false

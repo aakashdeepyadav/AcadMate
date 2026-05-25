@@ -52,7 +52,7 @@ fun AboutScreen(onBackClick: () -> Unit) {
             )
             
             Text(
-                "Version 1.0.0 (Production)",
+                "Version 1.3.0 (Production)",
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

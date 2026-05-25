@@ -15,7 +15,7 @@ import androidx.room.TypeConverters
         SyllabusEntity::class,
         SemesterResultEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

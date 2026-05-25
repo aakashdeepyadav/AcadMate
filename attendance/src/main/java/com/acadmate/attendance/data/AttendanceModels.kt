@@ -34,7 +34,7 @@ data class AttendanceRecord(
 )
 
 enum class AttendanceStatus {
-    PRESENT, ABSENT, LATE
+    PRESENT, ABSENT, LATE, LEAVE
 }
 
 // BLE Scan Result

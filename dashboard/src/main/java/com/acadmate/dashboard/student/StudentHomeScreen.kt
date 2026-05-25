@@ -28,7 +28,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.acadmate.designsystem.components.*
 import com.acadmate.designsystem.theme.*
 import com.acadmate.designsystem.components.AcadMateLogo
@@ -116,7 +118,7 @@ fun StudentHomeScreen(
 
             // Quick Stats glass row
             item {
-                QuickStatsRow(uiState)
+                QuickStatsRow(uiState, onActionClick)
             }
 
             // Academic Services Grid
@@ -124,14 +126,48 @@ fun StudentHomeScreen(
                 CategoryGridCard(
                     title = "Academic Hub",
                     actions = listOf(
+                        QuickActionItem("Community", Icons.Default.Forum, Color(0xFF34D399)),
                         QuickActionItem("Attendance", Icons.Default.CheckCircle, SoftBlue),
                         QuickActionItem("Timetable", Icons.Default.Event, AccentPurple),
                         QuickActionItem("Results", Icons.Default.Assessment, AccentEmerald),
                         QuickActionItem("Assignments", Icons.Default.Assignment, AccentPink),
                         QuickActionItem("Materials", Icons.Default.Folder, Color(0xFF6C5CE7)),
+                        QuickActionItem("Leave", Icons.Default.ExitToApp, Color(0xFFE17055)),
+                        QuickActionItem("Digital ID", Icons.Default.Badge, Color(0xFF6C5CE7)),
+                        QuickActionItem("Library", Icons.Default.AutoStories, AccentPurple),
+                        QuickActionItem("Fee Status", Icons.Default.Payments, Color(0xFF10B981))
+                    ),
+                    onActionClick = { action ->
+                        when(action) {
+                            "Digital ID" -> onActionClick("Digital ID Card")
+                            "Library" -> onActionClick("Digital Library")
+                            "Fee Status" -> onActionClick("Fee Payment")
+                            else -> onActionClick(action)
+                        }
+                    }
+                )
+            }
+
+            // Campus Life
+            item {
+                CategoryGridCard(
+                    title = "Campus Life",
+                    actions = listOf(
+                        QuickActionItem("Events", Icons.Default.Celebration, Color(0xFFF59E0B)),
+                        QuickActionItem("Placement", Icons.Default.Work, Color(0xFF10B981)),
+                        QuickActionItem("Hostel", Icons.Default.Bed, Color(0xFF6C5CE7)),
+                        QuickActionItem("Clubs", Icons.Default.Groups, SoftBlue),
                         QuickActionItem("Notice Board", Icons.Default.Campaign, AccentCyan)
                     ),
-                    onActionClick = onActionClick
+                    onActionClick = { action ->
+                        when(action) {
+                            "Events" -> onActionClick("Campus Events")
+                            "Placement" -> onActionClick("Placement Hub")
+                            "Hostel" -> onActionClick("Hostel Management")
+                            "Clubs" -> onActionClick("Campus Clubs")
+                            else -> onActionClick(action)
+                        }
+                    }
                 )
             }
 
@@ -255,7 +291,11 @@ fun HomeTopBar(uiState: HomeUiState, onProfileClick: () -> Unit, onActionClick: 
         ) {
             if (uiState.profilePictureUrl != null) {
                 AsyncImage(
-                    model = uiState.profilePictureUrl,
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(uiState.profilePictureUrl)
+                        .crossfade(true)
+                        .size(128)
+                        .build(),
                     contentDescription = "Profile",
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
@@ -529,30 +569,37 @@ fun EnhancedAttendanceHero(
 }
 
 @Composable
-fun QuickStatsRow(uiState: HomeUiState) {
+fun QuickStatsRow(uiState: HomeUiState, onActionClick: (String) -> Unit) {
     LazyRow(
         modifier = Modifier.fillMaxWidth(),
         contentPadding = PaddingValues(horizontal = LocalSpacing.current.md),
         horizontalArrangement = Arrangement.spacedBy(LocalSpacing.current.sm)
     ) {
         item {
-            StatMiniCard("CGPA", uiState.cgpaEstimate.toString(), Icons.Default.Insights, AccentEmerald)
+            StatMiniCard("CGPA", uiState.cgpaEstimate.toString(), Icons.Default.Insights, AccentEmerald) {
+                onActionClick("Results")
+            }
         }
         item {
-            StatMiniCard("Tasks", uiState.deadlines.size.toString(), Icons.Default.TaskAlt, AccentPink)
+            StatMiniCard("Tasks", uiState.taskCount.toString(), Icons.Default.TaskAlt, AccentPink) {
+                onActionClick("Assignments")
+            }
         }
         item {
-            StatMiniCard("Streak", "12 Days", Icons.Default.Whatshot, WarningAmber)
+            StatMiniCard("Streak", "${uiState.attendanceStreak} Days", Icons.Default.Whatshot, WarningAmber) {
+                // Future Streak Feature
+            }
         }
     }
 }
 
 @Composable
-fun StatMiniCard(label: String, value: String, icon: ImageVector, color: Color) {
+fun StatMiniCard(label: String, value: String, icon: ImageVector, color: Color, onClick: () -> Unit = {}) {
     AcadMateCard(
         variant = CardVariant.Glass,
         modifier = Modifier.width(110.dp),
-        contentPadding = 12.dp
+        contentPadding = 12.dp,
+        onClick = onClick
     ) {
         Column {
             Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(20.dp))

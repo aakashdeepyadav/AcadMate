@@ -14,6 +14,7 @@ import androidx.compose.runtime.*
 import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -27,6 +28,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.clip
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import androidx.compose.ui.layout.ContentScale
 import com.acadmate.attendance.domain.StudentAttendanceRecord
 
@@ -352,7 +354,11 @@ fun LiveStudentItem(student: StudentAttendanceRecord) {
             ) {
                 if (student.profilePictureUrl != null) {
                     AsyncImage(
-                        model = student.profilePictureUrl,
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(student.profilePictureUrl)
+                            .crossfade(true)
+                            .size(128)
+                            .build(),
                         contentDescription = null,
                         contentScale = ContentScale.Crop
                     )

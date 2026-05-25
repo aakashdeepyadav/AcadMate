@@ -47,8 +47,9 @@ local.properties
 *.keystore
 !debug.keystore
 
-# Google Services (usually excluded in public repos)
-app/google-services.json
+# Google Services (excluded for security)
+google-services.json
+**/google-services.json
 
 # Screenshots
 screenshots/
@@ -58,10 +59,17 @@ screenshots/
 *.swp
 *~
 
-# Presentation Content
+# Presentation and Prompt Files
 PRESENTATION_CONTENT.md
 AI_PRESENTATION_PROMPT.md
 ULTIMATE_10_SLIDE_DECK.md
+ACADMATE_ULTIMATE_PPT_PROMPT.md
+
+# AI and Tooling
+.kotlin/
+.studio/
+.idea/caches/
+.idea/modules/
 
 # Project Reports
 *.docx

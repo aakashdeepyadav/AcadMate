@@ -49,4 +49,5 @@ dependencies {
     implementation(libs.kotlinx.coroutines.play.services)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.google.generativeai)
+    implementation(libs.coil.compose)
 }

@@ -1,5 +1,9 @@
 package com.acadmate.dashboard.student
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.net.Uri
+import android.provider.OpenableColumns
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -39,16 +43,14 @@ fun LeaveApplicationScreen(
     viewModel: LeaveViewModel = hiltViewModel()
 ) {
     val requests by viewModel.leaveRequests.collectAsState()
-    val facultyList by viewModel.facultyList.collectAsState()
     val isSubmitting by viewModel.isSubmitting.collectAsState()
     var showApplyDialog by remember { mutableStateOf(false) }
 
     if (showApplyDialog) {
         ApplyLeaveDialog(
-            facultyList = facultyList,
             onDismiss = { showApplyDialog = false },
-            onApply = { start, end, reason, facultyId, facultyName ->
-                viewModel.submitLeaveRequest(start, end, reason, facultyId, facultyName)
+            onApply = { start, end, reason, medicalIssue, attachmentUri ->
+                viewModel.submitLeaveRequest(start, end, reason, medicalIssue, attachmentUri)
                 showApplyDialog = false
             },
             isSubmitting = isSubmitting
@@ -173,15 +175,31 @@ fun LeaveRequestItem(request: LeaveRequest) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ApplyLeaveDialog(
-    facultyList: List<Pair<String, String>>,
     onDismiss: () -> Unit,
-    onApply: (Long, Long, String, String, String) -> Unit,
+    onApply: (Long, Long, String, String?, Uri?) -> Unit,
     isSubmitting: Boolean
 ) {
     var reason by remember { mutableStateOf("") }
-    var selectedFaculty by remember { mutableStateOf<Pair<String, String>?>(null) }
-    var expanded by remember { mutableStateOf(false) }
+    var medicalIssue by remember { mutableStateOf("") }
+    var attachmentUri by remember { mutableStateOf<Uri?>(null) }
+    var fileName by remember { mutableStateOf<String?>(null) }
     val dateRangePickerState = rememberDateRangePickerState()
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        attachmentUri = uri
+        uri?.let {
+            val cursor = context.contentResolver.query(it, null, null, null, null)
+            cursor?.use { c ->
+                val nameIndex = c.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                if (c.moveToFirst()) {
+                    fileName = c.getString(nameIndex)
+                }
+            }
+        }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -193,37 +211,8 @@ fun ApplyLeaveDialog(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Text("Select faculty, date range and reason for your absence.", style = MaterialTheme.typography.bodySmall)
+                Text("Select date range and provide a reason for your absence. You can also attach a medical certificate if applicable.", style = MaterialTheme.typography.bodySmall)
                 
-                ExposedDropdownMenuBox(
-                    expanded = expanded,
-                    onExpandedChange = { expanded = !expanded }
-                ) {
-                    AcadMateTextField(
-                        value = selectedFaculty?.second ?: "",
-                        onValueChange = {},
-                        readOnly = true,
-                        label = "Forward to Faculty",
-                        placeholder = "Select Faculty",
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                        modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth()
-                    )
-                    ExposedDropdownMenu(
-                        expanded = expanded,
-                        onDismissRequest = { expanded = false }
-                    ) {
-                        facultyList.forEach { faculty ->
-                            DropdownMenuItem(
-                                text = { Text(faculty.second) },
-                                onClick = {
-                                    selectedFaculty = faculty
-                                    expanded = false
-                                }
-                            )
-                        }
-                    }
-                }
-
                 DateRangePicker(
                     state = dateRangePickerState,
                     modifier = Modifier.height(400.dp),
@@ -233,28 +222,57 @@ fun ApplyLeaveDialog(
                 )
 
                 AcadMateTextField(
+                    value = medicalIssue,
+                    onValueChange = { medicalIssue = it },
+                    label = "Medical Issue (Optional)",
+                    placeholder = "e.g. Fever, Fracture"
+                )
+
+                AcadMateTextField(
                     value = reason,
                     onValueChange = { reason = it },
                     label = "Reason for Leave",
-                    placeholder = "e.g. Medical emergency",
+                    placeholder = "e.g. Personal emergency or detailed medical reason",
                     modifier = Modifier.height(100.dp),
                     singleLine = false
                 )
+
+                OutlinedCard(
+                    onClick = { filePickerLauncher.launch("*/*") },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.UploadFile, null, tint = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = fileName ?: "Attach Supporting Document",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = "Medical Certificate or Prescription",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.Gray
+                            )
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
             AcadMateButton(
-                text = "Submit Request",
+                text = "Submit to Admin",
                 onClick = { 
                     val start = dateRangePickerState.selectedStartDateMillis ?: System.currentTimeMillis()
                     val end = dateRangePickerState.selectedEndDateMillis ?: start
-                    selectedFaculty?.let { 
-                        onApply(start, end, reason, it.first, it.second) 
-                    }
+                    onApply(start, end, reason, medicalIssue.ifBlank { null }, attachmentUri)
                 },
                 enabled = reason.isNotBlank() && 
                           dateRangePickerState.selectedStartDateMillis != null && 
-                          selectedFaculty != null &&
                           !isSubmitting,
                 loading = isSubmitting
             )

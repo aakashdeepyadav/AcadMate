@@ -34,7 +34,8 @@ class NoticeRepository @Inject constructor(
                     title = doc.getString("title") ?: "No Title",
                     date = dateStr,
                     content = doc.getString("content") ?: "",
-                    timestamp = timestamp
+                    timestamp = timestamp,
+                    attachmentUrl = doc.getString("attachmentUrl")
                 )
             }
 
@@ -47,13 +48,14 @@ class NoticeRepository @Inject constructor(
         }
     }
 
-    suspend fun postNotice(title: String, content: String) {
+    suspend fun postNotice(title: String, content: String, attachmentUrl: String? = null) {
         val timestamp = System.currentTimeMillis()
         val noticeData = hashMapOf(
             "title" to title,
             "content" to content,
             "timestamp" to timestamp,
-            "date" to java.text.SimpleDateFormat("dd MMM, yyyy", java.util.Locale.getDefault()).format(java.util.Date(timestamp))
+            "date" to java.text.SimpleDateFormat("dd MMM, yyyy", java.util.Locale.getDefault()).format(java.util.Date(timestamp)),
+            "attachmentUrl" to attachmentUrl
         )
         firestore.collection("announcements").add(noticeData).await()
         syncNotices()

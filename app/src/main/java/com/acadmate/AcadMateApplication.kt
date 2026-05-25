@@ -2,11 +2,11 @@ package com.acadmate
 
 import android.app.Application
 import android.util.Log
-import com.google.firebase.Firebase
-import com.google.firebase.appcheck.appCheck
+import com.google.firebase.FirebaseApp
 import com.google.firebase.appcheck.debug.DebugAppCheckProviderFactory
 import com.google.firebase.appcheck.playintegrity.PlayIntegrityAppCheckProviderFactory
-import com.google.firebase.initialize
+import com.google.firebase.appcheck.FirebaseAppCheck
+import com.google.firebase.Firebase
 import dagger.hilt.android.HiltAndroidApp
 import androidx.work.Configuration
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -31,16 +31,16 @@ class AcadMateApplication : Application(), Configuration.Provider {
         super.onCreate()
         
         try {
-            // 1. Initialize Firebase first
-            Firebase.initialize(context = this)
-
             val isDebug = (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
 
             if (isDebug) {
-                // FORCE a specific debug token so we don't have to search Logcat
+                // FORCE a specific debug token BEFORE Firebase initialization
                 System.setProperty("firebase.appcheck.debug.token", "8f7b3a21-9e12-4c5d-b8a1-f3a2b1c0d9e8")
                 Log.d("AppCheckSetup", "Forcing Debug Token: 8f7b3a21-9e12-4c5d-b8a1-f3a2b1c0d9e8")
             }
+
+            // 1. Initialize Firebase
+            FirebaseApp.initializeApp(this)
 
             // 2. Setup App Check Factory
             val factory = if (isDebug) {
@@ -51,8 +51,9 @@ class AcadMateApplication : Application(), Configuration.Provider {
                 PlayIntegrityAppCheckProviderFactory.getInstance()
             }
 
-            Firebase.appCheck.installAppCheckProviderFactory(factory)
-            Firebase.appCheck.setTokenAutoRefreshEnabled(true)
+            val firebaseAppCheck = FirebaseAppCheck.getInstance()
+            firebaseAppCheck.installAppCheckProviderFactory(factory)
+            firebaseAppCheck.setTokenAutoRefreshEnabled(true)
             Log.d("AppCheckSetup", "App Check Provider installed and auto-refresh enabled.")
             
             if (isDebug) {

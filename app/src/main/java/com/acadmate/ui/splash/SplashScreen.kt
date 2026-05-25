@@ -14,12 +14,14 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.acadmate.designsystem.theme.AcadMateTheme
 import com.acadmate.R
 import kotlinx.coroutines.delay
@@ -78,15 +80,7 @@ fun SplashScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        MaterialTheme.colorScheme.background,
-                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                        MaterialTheme.colorScheme.background
-                    )
-                )
-            ),
+            .background(MaterialTheme.colorScheme.background),
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -96,43 +90,14 @@ fun SplashScreen(
                 .alpha(alphaAnim)
         ) {
             AsyncImage(
-                model = R.drawable.acadmate,
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(com.acadmate.designsystem.R.drawable.acadmate)
+                    .size(512)
+                    .build(),
                 contentDescription = "AcadMate Logo",
-                modifier = Modifier.size(160.dp)
-            )
-            
-            Spacer(modifier = Modifier.height(24.dp))
-            
-            Text(
-                text = "AcadMate Elite",
-                style = MaterialTheme.typography.displaySmall.copy(
-                    fontWeight = FontWeight.Black,
-                    letterSpacing = (-1.5).sp
-                ),
-                color = MaterialTheme.colorScheme.onBackground
-            )
-            
-            Text(
-                text = "The Institutional Operating System",
-                style = MaterialTheme.typography.bodyLarge.copy(
-                    fontWeight = FontWeight.Medium,
-                    letterSpacing = 2.sp
-                ),
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
-                modifier = Modifier.padding(top = 8.dp)
+                modifier = Modifier.size(180.dp)
             )
         }
-        
-        // Version footer
-        Text(
-            text = "v1.2.0-Elite",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 48.dp)
-                .alpha(alphaAnim)
-        )
     }
 }
 

@@ -15,6 +15,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.acadmate.core.util.ValidationUtils
 import com.acadmate.designsystem.components.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -27,6 +28,9 @@ fun ResetPasswordScreen(
     var newPassword by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
+    
+    val passwordsMatch = newPassword == confirmPassword && newPassword.isNotEmpty()
+    val isPasswordStrong = ValidationUtils.isStrongPassword(newPassword)
 
     LaunchedEffect(uiState) {
         if (uiState is AuthUiState.PasswordResetSent) {
@@ -34,8 +38,6 @@ fun ResetPasswordScreen(
             viewModel.resetState()
         } else if (uiState is AuthUiState.Verified) {
             onSuccess("Password updated successfully!")
-            // We don't resetState here yet because the AppNavGraph handles the navigation based on uiState usually, 
-            // but for ResetPasswordScreen it uses onSuccess.
         }
     }
 
@@ -105,8 +107,19 @@ fun ResetPasswordScreen(
                             value = confirmPassword,
                             onValueChange = { confirmPassword = it },
                             label = "Confirm Password",
-                            visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation()
+                            visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                            isError = confirmPassword.isNotEmpty() && newPassword != confirmPassword,
+                            errorMessage = if (confirmPassword.isNotEmpty() && newPassword != confirmPassword) "Passwords do not match" else ""
                         )
+
+                        if (!isPasswordStrong && newPassword.isNotEmpty()) {
+                            Text(
+                                text = ValidationUtils.getPasswordStrengthErrorMessage(),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.labelSmall,
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
+                        }
 
                         if (uiState is AuthUiState.Error) {
                             Text(
@@ -121,7 +134,7 @@ fun ResetPasswordScreen(
                             onClick = { viewModel.updateInstitutionalPassword(newPassword) },
                             modifier = Modifier.fillMaxWidth(),
                             loading = uiState is AuthUiState.Loading,
-                            enabled = newPassword.isNotEmpty() && newPassword == confirmPassword
+                            enabled = passwordsMatch && isPasswordStrong
                         )
                     }
                 }

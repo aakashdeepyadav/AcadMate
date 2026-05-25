@@ -42,10 +42,21 @@ import com.acadmate.attendance.ui.screens.FacultySessionAttendanceScreen
 import com.acadmate.attendance.ui.screens.MarkAttendanceScreen
 import com.acadmate.dashboard.faculty.FacultyHomeScreen
 import com.acadmate.dashboard.faculty.FacultyTimetableScreen
+import com.acadmate.dashboard.faculty.LectureLogScreen
+import com.acadmate.dashboard.faculty.FacultyPerformanceAnalyticsScreen
+import com.acadmate.dashboard.faculty.FacultyCommunityScreen
 import com.acadmate.dashboard.student.StudentHomeScreen
 import com.acadmate.dashboard.student.AiSuiteScreen
 import com.acadmate.dashboard.student.TimetableScreen
 import com.acadmate.dashboard.student.ProfileScreen
+import com.acadmate.dashboard.student.DigitalIdCardScreen
+import com.acadmate.dashboard.student.PlacementHubScreen
+import com.acadmate.dashboard.student.CampusEventsScreen
+import com.acadmate.dashboard.student.HostelManagementScreen
+import com.acadmate.dashboard.student.DigitalLibraryScreen
+import com.acadmate.dashboard.student.FeePaymentScreen
+import com.acadmate.dashboard.student.StudentCommunityScreen
+import com.acadmate.dashboard.community.GroupChatScreen
 import com.acadmate.dashboard.student.ManageNotificationsScreen
 import com.acadmate.dashboard.student.LeaveApplicationScreen
 import com.acadmate.dashboard.student.LeaveViewModel
@@ -53,6 +64,7 @@ import com.acadmate.dashboard.faculty.LeaveManagementScreen
 import com.acadmate.auth.ui.AuthUiState
 import com.acadmate.auth.ui.ProfileSetupScreen
 import com.acadmate.auth.ui.ResetPasswordScreen
+import com.acadmate.auth.ui.UpdateProfileScreen
 import com.acadmate.auth.ui.LoginScreen
 import com.acadmate.auth.ui.OtpScreen
 import com.acadmate.auth.ui.RegistrationScreen
@@ -66,6 +78,10 @@ import com.acadmate.admin.ui.AdminDashboardScreen
 import com.acadmate.admin.ui.SyllabusManagementScreen
 import com.acadmate.admin.ui.CreateUserScreen
 import com.acadmate.admin.ui.CampusSetupScreen
+import com.acadmate.admin.ui.AdminLeaveManagementScreen
+import com.acadmate.admin.ui.CampusAnalyticsScreen
+import com.acadmate.admin.ui.AdminEventsScreen
+import com.acadmate.admin.ui.CommunityManagementScreen
 import com.acadmate.assignments.ui.AssignmentListScreen
 import com.acadmate.assignments.ui.CreateAssignmentScreen
 import com.acadmate.assignments.ui.AssignmentViewModel
@@ -425,6 +441,10 @@ fun AppNavGraph(
                                 onAiScheduleClick = { navController.navigate(Routes.AiTimetableGenerator) },
                                 onAuditLogClick = { navController.navigate(Routes.AuditLog) },
                                 onSettingsClick = { navController.navigate(Routes.CampusSetup) },
+                                onLeaveRequestsClick = { navController.navigate(Routes.AdminLeaveRequests) },
+                                onEventsClick = { navController.navigate(Routes.AdminEvents) },
+                                onAnalyticsClick = { navController.navigate(Routes.AdminAnalytics) },
+                                onCommunityClick = { navController.navigate(Routes.ManageCommunity) },
                                 onSignOut = {
                                     scope.launch {
                                         authViewModel.signOut()
@@ -450,11 +470,14 @@ fun AppNavGraph(
                                         "View Syllabus" -> navController.navigate(Routes.Syllabus)
                                         "Lesson Planner" -> navController.navigate(Routes.AiChat(mode = "PLANNER"))
                                         "Quiz Generator" -> navController.navigate(Routes.MockExamSetup)
+                                        "Community" -> navController.navigate(Routes.FacultyCommunity)
                                     }
                                 },
                                 onClassClick = { classId, hour ->
                                     navController.navigate(Routes.FacultyAttendance(classId = classId, hour = hour))
                                 },
+                                onLectureLogClick = { navController.navigate(Routes.LectureLogs) },
+                                onPerformanceAnalyticsClick = { navController.navigate(Routes.PerformanceAnalytics) },
                                 onProfileClick = { navController.navigate(Routes.Profile) }
                             )
                         }
@@ -479,6 +502,14 @@ fun AppNavGraph(
                                         "Leave" -> navController.navigate(Routes.LeaveApplication)
                                         "Results" -> navController.navigate(Routes.Results)
                                         "Notice Board" -> navController.navigate(Routes.NoticeBoard)
+                                        "Digital ID Card" -> navController.navigate(Routes.DigitalIdCard)
+                                        "Community" -> navController.navigate(Routes.CommunityGroups)
+                                        "Placement Hub" -> navController.navigate(Routes.PlacementHub)
+                                        "Campus Events" -> navController.navigate(Routes.CampusEvents)
+                                        "Hostel Management" -> navController.navigate(Routes.HostelManagement)
+                                        "Digital Library" -> navController.navigate(Routes.DigitalLibrary)
+                                        "Fee Payment" -> navController.navigate(Routes.FeePayment)
+                                        "Campus Clubs" -> navController.navigate(Routes.CampusClubs)
                                     }
                                 },
                                 onProfileClick = {
@@ -573,6 +604,21 @@ fun AppNavGraph(
                     NoticeBoardScreen(onBackClick = { navController.popBackStack() })
                 }
 
+                composable<Routes.LectureLogs> {
+                    LectureLogScreen(onBackClick = { navController.popBackStack() })
+                }
+
+                composable<Routes.PerformanceAnalytics> {
+                    FacultyPerformanceAnalyticsScreen(onBackClick = { navController.popBackStack() })
+                }
+
+                composable<Routes.FacultyCommunity> {
+                    FacultyCommunityScreen(
+                        onBackClick = { navController.popBackStack() },
+                        onChatClick = { groupId -> navController.navigate(Routes.GroupChat(groupId)) }
+                    )
+                }
+
                 // AI Features (Detail screens slide up)
                 composable<Routes.AiChat>(
                     enterTransition = { slideInVertically(initialOffsetY = { it }) },
@@ -648,6 +694,64 @@ fun AppNavGraph(
                     )
                 }
 
+                composable<Routes.DigitalIdCard> {
+                    DigitalIdCardScreen(
+                        onBackClick = { navController.popBackStack() }
+                    )
+                }
+
+                composable<Routes.PlacementHub> {
+                    PlacementHubScreen(
+                        onBackClick = { navController.popBackStack() }
+                    )
+                }
+
+                composable<Routes.CampusEvents> {
+                    CampusEventsScreen(
+                        onBackClick = { navController.popBackStack() }
+                    )
+                }
+
+                composable<Routes.CommunityGroups> {
+                    StudentCommunityScreen(
+                        onBackClick = { navController.popBackStack() },
+                        onChatClick = { groupId -> navController.navigate(Routes.GroupChat(groupId)) }
+                    )
+                }
+
+                composable<Routes.HostelManagement> {
+                    HostelManagementScreen(
+                        onBackClick = { navController.popBackStack() }
+                    )
+                }
+
+                composable<Routes.DigitalLibrary> {
+                    DigitalLibraryScreen(
+                        onBackClick = { navController.popBackStack() }
+                    )
+                }
+
+                composable<Routes.GroupChat> { backStackEntry ->
+                    val route: Routes.GroupChat = backStackEntry.toRoute()
+                    GroupChatScreen(
+                        groupId = route.groupId,
+                        onBackClick = { navController.popBackStack() }
+                    )
+                }
+
+                composable<Routes.FeePayment> {
+                    FeePaymentScreen(
+                        onBackClick = { navController.popBackStack() }
+                    )
+                }
+
+                composable<Routes.CampusClubs> {
+                    SimplePlaceholderScreen(
+                        title = "Campus Clubs & Communities",
+                        onBackClick = { navController.popBackStack() }
+                    )
+                }
+
                 composable<Routes.Profile> {
                 val authViewModel: AuthViewModel = hiltViewModel()
                 val onboardingViewModel: OnboardingViewModel = hiltViewModel()
@@ -659,6 +763,7 @@ fun AppNavGraph(
 
                 ProfileScreen(
                     onBackClick = { navController.popBackStack() },
+                    onEditSecurityClick = { navController.navigate(Routes.UpdateProfile) },
                     onSignOut = {
                         scope.launch {
                             authViewModel.signOut()
@@ -697,6 +802,14 @@ fun AppNavGraph(
                 composable<Routes.About> {
                     com.acadmate.dashboard.settings.AboutScreen(onBackClick = { navController.popBackStack() })
                 }
+
+                composable<Routes.UpdateProfile> {
+                    UpdateProfileScreen(
+                        viewModel = hiltViewModel(),
+                        onBackClick = { navController.popBackStack() },
+                        onNavigateToOtp = { phone -> navController.navigate(Routes.Otp(phone)) }
+                    )
+                }
             }
 
             // Admin Graph
@@ -711,6 +824,9 @@ fun AppNavGraph(
                         onAiScheduleClick = { navController.navigate(Routes.AiTimetableGenerator) },
                         onAuditLogClick = { navController.navigate(Routes.AuditLog) },
                         onSettingsClick = { navController.navigate(Routes.CampusSetup) },
+                        onLeaveRequestsClick = { navController.navigate(Routes.AdminLeaveRequests) },
+                        onEventsClick = { navController.navigate(Routes.AdminEvents) },
+                        onAnalyticsClick = { navController.navigate(Routes.AdminAnalytics) },
                         onSignOut = {
                             scope.launch {
                                 authViewModel.signOut()
@@ -768,6 +884,26 @@ fun AppNavGraph(
                 }
                 composable<Routes.AuditLog> {
                     AuditLogScreen(
+                        onBackClick = { navController.popBackStack() }
+                    )
+                }
+                composable<Routes.AdminLeaveRequests> {
+                    AdminLeaveManagementScreen(
+                        onBackClick = { navController.popBackStack() }
+                    )
+                }
+                composable<Routes.AdminEvents> {
+                    AdminEventsScreen(
+                        onBackClick = { navController.popBackStack() }
+                    )
+                }
+                composable<Routes.AdminAnalytics> {
+                    CampusAnalyticsScreen(
+                        onBackClick = { navController.popBackStack() }
+                    )
+                }
+                composable<Routes.ManageCommunity> {
+                    CommunityManagementScreen(
                         onBackClick = { navController.popBackStack() }
                     )
                 }

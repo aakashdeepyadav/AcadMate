@@ -11,14 +11,14 @@ plugins {
 
 android {
     namespace = "com.acadmate"
-    compileSdk = 36
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.acadmate"
         minSdk = 24
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 130
+        versionName = "1.3.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -50,6 +50,7 @@ android {
             force(libs.ktor.client.logging)
             force(libs.ktor.client.serialization)
             force(libs.ktor.serialization.kotlinx.json)
+            force(libs.com.google.dagger.hilt.android)
         }
     }
 }
@@ -81,6 +82,7 @@ dependencies {
     implementation(libs.androidx.lottie.compose)
     implementation(libs.coil.compose)
     implementation(libs.com.google.play.services.auth)
+    implementation(libs.play.services.basement)
     implementation(libs.com.google.dagger.hilt.android)
     implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.androidx.hilt.work)

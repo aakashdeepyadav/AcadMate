@@ -9,6 +9,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.ai.client.generativeai.GenerativeModel
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -47,6 +48,7 @@ class AiTutorViewModel @Inject constructor(
     val currentSession: StateFlow<ChatSession?> = _currentSession.asStateFlow()
 
     private var currentSessionId: String = UUID.randomUUID().toString()
+    private var messagesJob: Job? = null
 
     init {
         loadRealSyllabus()
@@ -92,11 +94,19 @@ class AiTutorViewModel @Inject constructor(
 
     fun setMode(mode: String) {
         _currentMode.value = mode
-        // If we don't have a session for this mode, we might want to create one or load the latest
         viewModelScope.launch {
-            val latestForMode = _sessions.value.firstOrNull { it.mode == mode }
+            // Wait for sessions to be loaded or check DB
+            val sessionList = if (_sessions.value.isEmpty()) {
+                chatDao.getAllSessions().first()
+            } else {
+                _sessions.value
+            }
+
+            val latestForMode = sessionList.firstOrNull { it.mode == mode }
             if (latestForMode != null) {
-                loadConversationHistory(latestForMode.id)
+                if (currentSessionId != latestForMode.id) {
+                    loadConversationHistory(latestForMode.id)
+                }
             } else {
                 createNewSession(mode)
             }
@@ -104,31 +114,36 @@ class AiTutorViewModel @Inject constructor(
     }
 
     fun createNewSession(mode: String, subject: String? = null, unit: String? = null) {
-        val newSession = ChatSession(
-            title = if (subject != null) "Study: $subject" else "New $mode Session",
-            mode = mode,
-            subject = subject,
-            unit = unit
-        )
         viewModelScope.launch {
+            val newSession = ChatSession(
+                title = if (subject != null) "Study: $subject" else "New $mode Session",
+                mode = mode,
+                subject = subject,
+                unit = unit
+            )
             chatDao.insertSession(newSession)
-            _currentSession.value = newSession
-            currentSessionId = newSession.id
-            _messages.value = emptyList()
+            loadConversationHistory(newSession.id)
         }
     }
 
     fun loadConversationHistory(sessionId: String) {
         currentSessionId = sessionId
-        viewModelScope.launch {
+        messagesJob?.cancel()
+        messagesJob = viewModelScope.launch {
             val session = chatDao.getSessionById(sessionId)
             _currentSession.value = session
             if (session != null) {
                 _currentMode.value = session.mode
             }
 
-            chatDao.getMessagesBySession(sessionId).collect {
-                _messages.value = it
+            chatDao.getMessagesBySession(sessionId).collect { dbMessages ->
+                // Merge with in-memory streaming message to prevent disappearing during generation
+                val streamingMessage = _messages.value.find { it.isStreaming }
+                if (streamingMessage != null && !dbMessages.any { it.id == streamingMessage.id }) {
+                    _messages.value = dbMessages + streamingMessage
+                } else {
+                    _messages.value = dbMessages
+                }
             }
         }
     }
@@ -211,10 +226,22 @@ class AiTutorViewModel @Inject constructor(
     fun sendMessage(text: String, subject: String?, unit: String? = null) {
         if (text.isBlank()) return
 
-        // Update current session metadata if needed
-        val currentSess = _currentSession.value
-        if (currentSess != null) {
-            viewModelScope.launch {
+        viewModelScope.launch {
+            // 1. Ensure we have a valid session and capture its ID deterministically
+            val sessionId = if (_currentSession.value == null) {
+                val newSessionId = UUID.randomUUID().toString()
+                val newSession = ChatSession(
+                    id = newSessionId,
+                    title = if (subject != null) "Study: $subject" else "New ${_currentMode.value} Session",
+                    mode = _currentMode.value,
+                    subject = subject,
+                    unit = unit
+                )
+                chatDao.insertSession(newSession)
+                loadConversationHistory(newSessionId)
+                newSessionId
+            } else {
+                val currentSess = _currentSession.value!!
                 val updatedSession = currentSess.copy(
                     lastUpdated = System.currentTimeMillis(),
                     subject = subject ?: currentSess.subject,
@@ -223,19 +250,15 @@ class AiTutorViewModel @Inject constructor(
                 )
                 chatDao.insertSession(updatedSession)
                 _currentSession.value = updatedSession
+                currentSess.id
             }
-        } else {
-            // Create session if it doesn't exist
-            createNewSession(_currentMode.value, subject, unit)
-        }
 
-        val userMessage = ChatMessage(
-            sessionId = currentSessionId,
-            text = text,
-            role = MessageRole.USER
-        )
+            val userMessage = ChatMessage(
+                sessionId = sessionId,
+                text = text,
+                role = MessageRole.USER
+            )
 
-        viewModelScope.launch {
             chatDao.insertMessage(userMessage)
             _suggestions.value = emptyList()
             _isTyping.value = true
@@ -245,30 +268,54 @@ class AiTutorViewModel @Inject constructor(
             
             val aiMessage = ChatMessage(
                 id = aiMessageId,
-                sessionId = currentSessionId,
+                sessionId = sessionId,
                 text = "",
                 role = MessageRole.MODEL,
                 isStreaming = true
             )
-            _messages.value = _messages.value + userMessage + aiMessage
+            
+            // Add to UI immediately
+            _messages.value = _messages.value + aiMessage
 
             try {
                 val studentContext = getStudentContext()
-                val currentSyllabusList = if (_realSyllabus.value.isNotEmpty()) _realSyllabus.value 
-                                          else com.acadmate.core.model.PredefinedSyllabus.bTechCse6thSem
-                                          
-                val dynamicSyllabusContext = currentSyllabusList.joinToString("\n") { sub ->
-                    "${sub.subjectCode}: ${sub.subjectName} - ${sub.description}\nUnits: " + sub.units.joinToString("; ") { it.title }
+                
+                // Fetch the latest syllabus from the database to ensure it's dynamic and not hardcoded
+                val latestSyllabusSnapshot = firestore.collection("syllabuses").get().await()
+                val currentSyllabusList = latestSyllabusSnapshot.toObjects(com.acadmate.core.model.SubjectSyllabus::class.java)
+                    .ifEmpty { com.acadmate.core.model.PredefinedSyllabus.bTechCse6thSem }
+
+                // Determine which subject the student is asking about if not explicitly selected
+                val inferredSubject = if (subject == null) {
+                    currentSyllabusList.find { text.contains(it.subjectName, ignoreCase = true) || text.contains(it.subjectCode, ignoreCase = true) }?.subjectName
+                } else subject
+
+                // Build a high-fidelity syllabus context for the relevant subject(s)
+                val relevantSyllabusContext = if (inferredSubject != null) {
+                    val sub = currentSyllabusList.find { it.subjectName == inferredSubject }
+                    if (sub != null) {
+                        "OFFICIAL SYLLABUS FOR ${sub.subjectName} (${sub.subjectCode}):\n" +
+                        "Description: ${sub.description}\n" +
+                        sub.units.joinToString("\n") { unit -> 
+                            "Unit: ${unit.title}\nTopics: ${unit.topics.joinToString(", ")}"
+                        }
+                    } else "General Syllabus context unavailable."
+                } else {
+                    "OVERVIEW OF SEMESTER SYLLABUS:\n" + currentSyllabusList.joinToString("\n") { sub ->
+                        "${sub.subjectCode}: ${sub.subjectName} - Units: " + sub.units.joinToString("; ") { it.title }
+                    }
                 }
 
                 val tutorPrompt = """
-                    You are AcadMate AI, an elite B.Tech Computer Science Engineering Professor and academic tutor. 
-                    You specialize in the current B.Tech CSE 6th Semester curriculum which includes:
-                    $dynamicSyllabusContext
+                    You are AcadMate AI, an elite B.Tech Computer Science Engineering Professor. 
+                    Your knowledge is strictly grounded in the following official institutional syllabus retrieved from the database:
+                    $relevantSyllabusContext
 
-                    When answering questions, provide concrete code examples (Java/Python/C++), discuss Time/Space complexity, 
-                    and relate concepts to real-world software architecture where applicable.
-                    Use the following student context to personalize your answers if relevant:
+                    INSTRUCTIONS:
+                    1. If the student asks for notes, explain the topics specified in the syllabus for that unit in detail.
+                    2. Provide concrete code examples where applicable.
+                    3. Discuss technical architecture and real-world relevance.
+                    4. Use the following student performance context to personalize your tone:
                     $studentContext
                 """.trimIndent()
 
@@ -291,7 +338,7 @@ class AiTutorViewModel @Inject constructor(
                     You are AcadMate Study Architect. Your goal is to create a hyper-personalized study roadmap for the student.
                     Analyze their upcoming assignments, attendance, and syllabus gaps to prioritize what they should study next.
                     Institutional Syllabus for Reference:
-                    $dynamicSyllabusContext
+                    $relevantSyllabusContext
                     
                     Student Context: $studentContext
                     
@@ -303,7 +350,7 @@ class AiTutorViewModel @Inject constructor(
                     Your goal is to help a Professor create a comprehensive, engaging, and time-optimized Lesson Plan for their specific syllabus.
                     
                     Institutional Syllabus Context:
-                    $dynamicSyllabusContext
+                    $relevantSyllabusContext
 
                     When a professor asks for a lesson plan or lecture draft:
                     1.  **Learning Objectives**: Define what students should know by the end of the session.
@@ -347,7 +394,7 @@ class AiTutorViewModel @Inject constructor(
                 
                 val finalMessage = ChatMessage(
                     id = aiMessageId,
-                    sessionId = currentSessionId,
+                    sessionId = sessionId,
                     text = aiText,
                     role = MessageRole.MODEL,
                     isStreaming = false

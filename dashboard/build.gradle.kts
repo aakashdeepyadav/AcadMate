@@ -53,6 +53,7 @@ dependencies {
     implementation(libs.firebase.auth)
     implementation("com.google.firebase:firebase-storage")
     implementation(libs.kotlinx.coroutines.play.services)
+    implementation(libs.zxing.core)
 
     implementation(project(":core"))
     implementation(project(":designsystem"))

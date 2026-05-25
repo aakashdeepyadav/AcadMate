@@ -44,6 +44,8 @@ fun FacultyHomeScreen(
     viewModel: FacultyHomeViewModel = hiltViewModel(),
     onActionClick: (String, String?) -> Unit,
     onClassClick: (String, Int?) -> Unit,
+    onLectureLogClick: () -> Unit = {},
+    onPerformanceAnalyticsClick: () -> Unit = {},
     onProfileClick: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -109,7 +111,9 @@ fun FacultyHomeScreen(
                             ?: uiState.upcomingClasses.firstOrNull()?.id
                         QuickActionGrid(
                             defaultClassId = currentOrNextClass,
-                            onActionClick = onActionClick
+                            onActionClick = onActionClick,
+                            onLectureLogClick = onLectureLogClick,
+                            onPerformanceAnalyticsClick = onPerformanceAnalyticsClick
                         )
                     }
 
@@ -233,17 +237,20 @@ fun StatMiniCard(
 @Composable
 fun QuickActionGrid(
     defaultClassId: String?,
-    onActionClick: (String, String?) -> Unit
+    onActionClick: (String, String?) -> Unit,
+    onLectureLogClick: () -> Unit = {},
+    onPerformanceAnalyticsClick: () -> Unit = {}
 ) {
     val actions = listOf(
         FacultyAction("Take Attendance", Icons.AutoMirrored.Filled.FactCheck, Color(0xFF4F46E5), "Mark Attendance"),
         FacultyAction("Assignments", Icons.AutoMirrored.Filled.Assignment, Color(0xFFF59E0B), "Post Assignment"),
-        FacultyAction("Materials", Icons.AutoMirrored.Filled.LibraryBooks, Color(0xFF10B981), "Materials"),
         FacultyAction("Gradebook", Icons.Default.Grade, Color(0xFF8B5CF6), "Gradebook"),
-        FacultyAction("Leave Mgmt", Icons.AutoMirrored.Filled.EventNote, Color(0xFFEC4899), "Leave Management"),
-        FacultyAction("Timetable", Icons.Default.CalendarMonth, Color(0xFFE17055), "Timetable"),
-        FacultyAction("Announce", Icons.Default.Campaign, Color(0xFF6C5CE7), "Notice Board"),
-        FacultyAction("Syllabus", Icons.AutoMirrored.Filled.MenuBook, Color(0xFF0EA5E9), "View Syllabus")
+        FacultyAction("Lecture Logs", Icons.Default.HistoryEdu, Color(0xFF10B981), "Lecture Logs"),
+        FacultyAction("Analytics", Icons.Default.Insights, Color(0xFFEC4899), "Analytics"),
+        FacultyAction("Materials", Icons.AutoMirrored.Filled.LibraryBooks, Color(0xFF0EA5E9), "Materials"),
+        FacultyAction("Community", Icons.Default.Forum, Color(0xFF34D399), "Community"),
+        FacultyAction("Timetable", Icons.Default.CalendarMonth, Color(0xFF6C5CE7), "Timetable"),
+        FacultyAction("Announce", Icons.Default.Campaign, Color(0xFF2D3436), "Notice Board")
     )
 
     Column(verticalArrangement = Arrangement.spacedBy(LocalSpacing.current.sm)) {
@@ -257,8 +264,14 @@ fun QuickActionGrid(
                         modifier = Modifier.weight(1f).height(100.dp),
                         variant = CardVariant.Elevated,
                         onClick = { 
-                            val effectiveId = if (action.route == "Mark Attendance") defaultClassId else null
-                            onActionClick(action.route, effectiveId) 
+                            when(action.route) {
+                                "Lecture Logs" -> onLectureLogClick()
+                                "Analytics" -> onPerformanceAnalyticsClick()
+                                else -> {
+                                    val effectiveId = if (action.route == "Mark Attendance") defaultClassId else null
+                                    onActionClick(action.route, effectiveId) 
+                                }
+                            }
                         }
                     ) {
                         Column(

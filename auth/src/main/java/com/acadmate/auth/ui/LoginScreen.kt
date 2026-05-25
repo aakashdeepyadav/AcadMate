@@ -20,6 +20,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -328,6 +329,8 @@ fun CredentialLoginForm(
     uiState: AuthUiState,
     onLogin: () -> Unit
 ) {
+    var passwordVisible by remember { mutableStateOf(false) }
+
     Column(verticalArrangement = Arrangement.spacedBy(LocalSpacing.current.md)) {
         Text(
             text = "Welcome back",
@@ -368,7 +371,15 @@ fun CredentialLoginForm(
             leadingIcon = {
                 Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(20.dp))
             },
-            visualTransformation = PasswordVisualTransformation(),
+            trailingIcon = {
+                IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                    Icon(
+                        imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                        contentDescription = if (passwordVisible) "Hide password" else "Show password"
+                    )
+                }
+            },
+            visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
             modifier = Modifier.fillMaxWidth()
         )
